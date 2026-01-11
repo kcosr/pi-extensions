@@ -1,5 +1,5 @@
 /**
- * Telemetry Extension
+ * Toolwatch Extension
  *
  * Captures tool calls and results for auditing.
  * Supports HTTP, file (JSONL), or both with configurable modes.
@@ -15,7 +15,7 @@ import {
   getUser,
   filterParams,
   type Config,
-  type TelemetryEvent,
+  type ToolwatchEvent,
   type ToolCallEvent,
   type ToolResultEvent,
   type ApprovalResponse,
@@ -30,7 +30,7 @@ export default function (pi: ExtensionAPI) {
   const callTimestamps = new Map<string, number>();
 
   // Send event (async, fire-and-forget)
-  function sendEventAsync(event: TelemetryEvent): void {
+  function sendEventAsync(event: ToolwatchEvent): void {
     const payload = JSON.stringify(event);
 
     switch (config.mode) {
@@ -109,7 +109,7 @@ export default function (pi: ExtensionAPI) {
     const ts = Date.now();
     callTimestamps.set(event.toolCallId, ts);
 
-    const telemetryEvent: ToolCallEvent = {
+    const toolCallEvent: ToolCallEvent = {
       type: "tool_call",
       ts,
       toolCallId: event.toolCallId,
@@ -124,15 +124,15 @@ export default function (pi: ExtensionAPI) {
 
     // Sync mode: wait for approval
     if (config.http.sync && config.mode !== "file") {
-      const approval = await sendEventSync(telemetryEvent);
+      const approval = await sendEventSync(toolCallEvent);
       if (!approval.approved) {
-        return { block: true, reason: approval.reason ?? "Blocked by telemetry policy" };
+        return { block: true, reason: approval.reason ?? "Blocked by toolwatch policy" };
       }
       return undefined;
     }
 
     // Async mode: fire and forget
-    sendEventAsync(telemetryEvent);
+    sendEventAsync(toolCallEvent);
     return undefined;
   });
 
@@ -143,7 +143,7 @@ export default function (pi: ExtensionAPI) {
     const callTs = callTimestamps.get(event.toolCallId);
     callTimestamps.delete(event.toolCallId);
 
-    const telemetryEvent: ToolResultEvent = {
+    const toolResultEvent: ToolResultEvent = {
       type: "tool_result",
       ts,
       toolCallId: event.toolCallId,
@@ -155,7 +155,7 @@ export default function (pi: ExtensionAPI) {
     };
 
     // Results are always async (no approval needed)
-    sendEventAsync(telemetryEvent);
+    sendEventAsync(toolResultEvent);
     return undefined;
   });
 }

@@ -34,7 +34,7 @@ export interface ToolCallFilter {
   offset?: number;
 }
 
-export class TelemetryDB {
+export class ToolwatchDB {
   private db: Database.Database;
 
   constructor(dbPath: string) {

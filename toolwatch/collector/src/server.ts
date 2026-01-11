@@ -1,11 +1,11 @@
 import http from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
-import { TelemetryDB, type ToolCallFilter, type ToolCall } from "./db.js";
+import { ToolwatchDB, type ToolCallFilter, type ToolCall } from "./db.js";
 import { renderPage } from "./ui.js";
 import { evaluateRules } from "./rules.js";
 import { loadPlugin, registerPlugin } from "./plugin-loader.js";
 import { loadConfig } from "./config.js";
-import type { ToolCallEvent, ToolResultEvent, TelemetryEvent, Config } from "./types.js";
+import type { ToolCallEvent, ToolResultEvent, ToolwatchEvent, Config } from "./types.js";
 
 // Import manual plugin and register it so plugin-loader uses the same instance
 import manualPlugin, { initManualPlugin, approve, deny, onPendingChange } from "../plugins/manual.js";
@@ -24,7 +24,7 @@ function broadcast(message: object) {
   }
 }
 
-export function createServer(db: TelemetryDB, port: number) {
+export function createServer(db: ToolwatchDB, port: number) {
   const config = loadConfig();
 
   // Initialize manual plugin with DB reference and broadcast callback
@@ -46,10 +46,10 @@ export function createServer(db: TelemetryDB, port: number) {
     }
 
     try {
-      // POST /events - receive telemetry and evaluate rules
+      // POST /events - receive tool call events and evaluate rules
       if (req.method === "POST" && url.pathname === "/events") {
         const body = await readBody(req);
-        const event = JSON.parse(body) as TelemetryEvent;
+        const event = JSON.parse(body) as ToolwatchEvent;
 
         if (event.type === "tool_call") {
           // Evaluate rules first to determine if we need approval
@@ -215,7 +215,7 @@ export function createServer(db: TelemetryDB, port: number) {
 async function evaluateToolCall(
   event: ToolCallEvent,
   config: Config,
-  db: TelemetryDB
+  db: ToolwatchDB
 ): Promise<{ approved: boolean; reason?: string }> {
   const { response, pluginName } = evaluateRules(event, config.rules);
 

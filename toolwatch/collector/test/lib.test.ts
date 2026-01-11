@@ -163,7 +163,7 @@ describe("config defaults", () => {
       timeoutAction: "block",
     },
     file: {
-      path: "/tmp/pi-telemetry.jsonl", // Note: actual path uses os.tmpdir()
+      path: "/tmp/toolwatch.jsonl", // Note: actual path uses os.tmpdir()
     },
     tools: ["bash", "read", "grep"],
   };

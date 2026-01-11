@@ -3,19 +3,19 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { TelemetryDB } from "../src/db.js";
+import { ToolwatchDB } from "../src/db.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-describe("TelemetryDB", () => {
-  let db: TelemetryDB;
+describe("ToolwatchDB", () => {
+  let db: ToolwatchDB;
   let dbPath: string;
 
   beforeEach(() => {
     // Create temp DB for each test
     dbPath = path.join(os.tmpdir(), `toolwatch-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
-    db = new TelemetryDB(dbPath);
+    db = new ToolwatchDB(dbPath);
   });
 
   afterEach(() => {

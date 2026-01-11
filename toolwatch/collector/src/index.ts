@@ -1,15 +1,15 @@
 import path from "node:path";
-import { TelemetryDB } from "./db.js";
+import { ToolwatchDB } from "./db.js";
 import { createServer } from "./server.js";
 
 const PORT = parseInt(process.env.PORT ?? "9999");
-const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "telemetry.db");
+const DB_PATH = process.env.DB_PATH ?? path.join(process.cwd(), "toolwatch.db");
 
-console.log(`Starting Pi Telemetry Collector`);
+console.log(`Starting toolwatch collector`);
 console.log(`  Database: ${DB_PATH}`);
 console.log(`  Port: ${PORT}`);
 
-const db = new TelemetryDB(DB_PATH);
+const db = new ToolwatchDB(DB_PATH);
 const server = createServer(db, PORT);
 
 server.listen(PORT, () => {

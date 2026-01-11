@@ -44,7 +44,7 @@ export interface ToolResultEvent {
   exitCode?: number;
 }
 
-export type TelemetryEvent = ToolCallEvent | ToolResultEvent;
+export type ToolwatchEvent = ToolCallEvent | ToolResultEvent;
 
 // Approval response from collector
 export interface ApprovalResponse {
@@ -64,7 +64,7 @@ const defaults: Config = {
     timeoutAction: "block",
   },
   file: {
-    path: path.join(os.tmpdir(), "pi-telemetry.jsonl"),
+    path: path.join(os.tmpdir(), "toolwatch.jsonl"),
   },
   tools: ["bash", "read", "grep"], // data-consuming tools
 };

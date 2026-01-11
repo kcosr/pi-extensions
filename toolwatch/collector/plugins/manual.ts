@@ -6,10 +6,10 @@
  */
 
 import type { ToolCallEvent, ApprovalResponse, ApprovalPlugin } from "../src/types.js";
-import type { TelemetryDB, ToolCall } from "../src/db.js";
+import type { ToolwatchDB, ToolCall } from "../src/db.js";
 
 // Reference to DB, set by server on startup
-let db: TelemetryDB | null = null;
+let db: ToolwatchDB | null = null;
 
 // Callback to notify UI of pending changes
 let notifyPendingChange: ((pending: ToolCall[]) => void) | null = null;
@@ -24,7 +24,7 @@ const POLL_INTERVAL_MS = 500;
  * Initialize the plugin with database reference
  */
 export function initManualPlugin(
-  database: TelemetryDB,
+  database: ToolwatchDB,
   onPendingChange?: (pending: ToolCall[]) => void
 ): void {
   db = database;

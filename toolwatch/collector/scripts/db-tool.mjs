@@ -21,10 +21,10 @@
  *   --dry-run           Show what would be deleted without deleting
  *
  * Examples:
- *   node scripts/db-tool.mjs ./telemetry.db export --user alice --output export.json
- *   node scripts/db-tool.mjs ./telemetry.db export --before 2026-01-01 --tool bash
- *   node scripts/db-tool.mjs ./telemetry.db delete --approval pending --dry-run
- *   node scripts/db-tool.mjs ./telemetry.db delete --before 2026-01-01
+ *   node scripts/db-tool.mjs ./toolwatch.db export --user alice --output export.json
+ *   node scripts/db-tool.mjs ./toolwatch.db export --before 2026-01-01 --tool bash
+ *   node scripts/db-tool.mjs ./toolwatch.db delete --approval pending --dry-run
+ *   node scripts/db-tool.mjs ./toolwatch.db delete --before 2026-01-01
  */
 
 import Database from "better-sqlite3";
@@ -52,8 +52,8 @@ Options:
   --dry-run           Show what would be deleted without deleting
 
 Examples:
-  node scripts/db-tool.mjs ./telemetry.db export --user alice --output export.json
-  node scripts/db-tool.mjs ./telemetry.db delete --before 2026-01-01 --dry-run`);
+  node scripts/db-tool.mjs ./toolwatch.db export --user alice --output export.json
+  node scripts/db-tool.mjs ./toolwatch.db delete --before 2026-01-01 --dry-run`);
   process.exit(1);
 }
 

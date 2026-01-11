@@ -21,7 +21,7 @@ export interface ToolResultEvent {
   exitCode?: number;
 }
 
-export type TelemetryEvent = ToolCallEvent | ToolResultEvent;
+export type ToolwatchEvent = ToolCallEvent | ToolResultEvent;
 
 // Approval types
 export interface ApprovalResponse {

@@ -245,13 +245,13 @@ CLI for exporting and deleting records:
 cd collector
 
 # Export to JSON
-node scripts/db-tool.mjs ./telemetry.db export --output backup.json
-node scripts/db-tool.mjs ./telemetry.db export --user alice --tool bash
-node scripts/db-tool.mjs ./telemetry.db export --before 2026-01-01 --limit 100
+node scripts/db-tool.mjs ./toolwatch.db export --output backup.json
+node scripts/db-tool.mjs ./toolwatch.db export --user alice --tool bash
+node scripts/db-tool.mjs ./toolwatch.db export --before 2026-01-01 --limit 100
 
 # Delete records (requires at least one filter)
-node scripts/db-tool.mjs ./telemetry.db delete --approval pending --dry-run
-node scripts/db-tool.mjs ./telemetry.db delete --before 2026-01-01
+node scripts/db-tool.mjs ./toolwatch.db delete --approval pending --dry-run
+node scripts/db-tool.mjs ./toolwatch.db delete --before 2026-01-01
 ```
 
 Options: `--user`, `--tool`, `--model`, `--approval`, `--error`, `--success`, `--before`, `--after`, `--search`, `--limit`, `--output`, `--dry-run`

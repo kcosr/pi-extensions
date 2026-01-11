@@ -14,95 +14,230 @@ interface Filters {
 }
 
 const baseStyles = `
+    @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+    :root {
+      color-scheme: light;
+      --bg: #f3f5f8;
+      --bg-gradient: linear-gradient(180deg, #f6f8fb 0%, #eef2f7 100%);
+      --panel: #ffffff;
+      --panel-soft: #f7f9fc;
+      --panel-muted: #f0f3f7;
+      --border: #d7dde6;
+      --shadow: 0 10px 30px rgba(20, 30, 45, 0.08);
+      --text: #1f2a37;
+      --text-muted: #667085;
+      --text-strong: #0f172a;
+      --accent: #274060;
+      --accent-soft: #3f5a7a;
+      --success: #1f6f43;
+      --warning: #9a6a16;
+      --error: #9f2d2d;
+      --row-hover: #f2f6fb;
+      --row-alt: #f8fafc;
+      --code-bg: #eef2f6;
+    }
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0b111b;
+      --bg-gradient: linear-gradient(180deg, #0f172a 0%, #0b111b 100%);
+      --panel: #121a28;
+      --panel-soft: #182235;
+      --panel-muted: #1f2b3f;
+      --border: #2a364a;
+      --shadow: 0 12px 30px rgba(5, 10, 20, 0.45);
+      --text: #e2e8f0;
+      --text-muted: #97a6ba;
+      --text-strong: #f8fafc;
+      --accent: #9fb4d4;
+      --accent-soft: #b9c8df;
+      --success: #7bc89c;
+      --warning: #e1b86e;
+      --error: #e08a8a;
+      --row-hover: #1b2639;
+      --row-alt: #151f30;
+      --code-bg: #101826;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-      background: #0d1117;
-      color: #c9d1d9;
-      padding: 20px;
+      font-family: "IBM Plex Sans", "Source Sans 3", "Helvetica Neue", "Segoe UI", sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text);
+      padding: 0;
     }
-    h1 { color: #58a6ff; margin-bottom: 20px; }
-    a { color: #58a6ff; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .stats {
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 24px 40px;
+      animation: fadeUp 220ms ease-out;
+    }
+    .page-header {
       display: flex;
-      gap: 20px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
       margin-bottom: 20px;
     }
-    .stat {
-      background: #161b22;
-      padding: 15px 20px;
-      border-radius: 6px;
-      border: 1px solid #30363d;
+    h1 {
+      color: var(--text-strong);
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
     }
-    .stat-value { font-size: 24px; font-weight: bold; color: #58a6ff; }
-    .stat-label { font-size: 12px; color: #8b949e; }
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+    }
+    .theme-toggle:hover { background: var(--panel-muted); }
+    .theme-toggle svg { width: 26px; height: 26px; }
+    .theme-toggle .icon-sun { display: none; }
+    [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .stat {
+      background: var(--panel);
+      padding: 16px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      animation: fadeUp 240ms ease-out both;
+    }
+    .stat:nth-child(2) { animation-delay: 40ms; }
+    .stat:nth-child(3) { animation-delay: 80ms; }
+    .stat:nth-child(4) { animation-delay: 120ms; }
+    .stat-value { font-size: 20px; font-weight: 600; color: var(--text-strong); }
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 4px;
+    }
     .filters {
       display: flex;
       gap: 10px;
       margin-bottom: 20px;
       flex-wrap: wrap;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+      animation: fadeUp 240ms ease-out 120ms both;
     }
     select, input[type="text"] {
-      background: #161b22;
-      border: 1px solid #30363d;
-      color: #c9d1d9;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      color: var(--text);
       padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      min-width: 140px;
     }
-    select:focus, input:focus { outline: none; border-color: #58a6ff; }
+    select:focus, input:focus {
+      outline: none;
+      border-color: var(--accent-soft);
+      box-shadow: 0 0 0 3px rgba(39, 64, 96, 0.12);
+    }
     button {
-      background: #238636;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 6px;
+      background: var(--accent);
+      color: #f8fafc;
+      border: 1px solid transparent;
+      padding: 8px 14px;
+      border-radius: 8px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
     }
-    button:hover { background: #2ea043; }
-    button.secondary { background: #30363d; }
-    button.secondary:hover { background: #484f58; }
-    button.danger { background: #da3633; }
-    button.danger:hover { background: #f85149; }
+    button:hover { background: #324f75; }
+    button.secondary {
+      background: var(--panel-soft);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    button.secondary:hover { background: var(--panel-muted); }
+    button.danger { background: #7f2c2c; }
+    button.danger:hover { background: #943737; }
     table {
       width: 100%;
       border-collapse: collapse;
-      background: #161b22;
-      border-radius: 6px;
+      background: var(--panel);
+      border-radius: 12px;
       overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      animation: fadeUp 240ms ease-out 160ms both;
     }
     th, td {
-      padding: 12px;
+      padding: 12px 14px;
       text-align: left;
-      border-bottom: 1px solid #30363d;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
     }
-    th { background: #21262d; color: #8b949e; font-weight: 500; }
-    tr:hover { background: #1f2428; }
-    .tool { color: #f0883e; }
-    .user { color: #a371f7; }
-    .model { color: #7ee787; }
-    .error { color: #f85149; }
-    .success { color: #3fb950; }
-    .warning { color: #d29922; }
+    th {
+      background: var(--panel-muted);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 11px;
+    }
+    tbody tr:nth-child(even) { background: var(--row-alt); }
+    tr:hover { background: var(--row-hover); }
+    .tool { color: var(--accent); font-weight: 500; }
+    .user { color: #3f4f63; font-weight: 500; }
+    .model { color: #2f5f55; font-weight: 500; }
+    .error { color: var(--error); font-weight: 600; }
+    .success { color: var(--success); font-weight: 600; }
+    .warning { color: var(--warning); font-weight: 600; }
+    .has-tooltip {
+      text-decoration: underline dotted;
+      text-underline-offset: 3px;
+      cursor: help;
+    }
     .params {
-      max-width: 400px;
+      max-width: 420px;
       overflow: auto;
-      max-height: 100px;
+      max-height: 110px;
     }
     .params code {
       display: inline-block;
       font-size: 12px;
-      font-family: monospace;
-      background: #0d1117;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+      background: var(--code-bg);
       padding: 4px 8px;
-      border-radius: 4px;
-      color: #c9d1d9;
+      border-radius: 6px;
+      color: #243447;
+      border: 1px solid var(--border);
       white-space: pre;
     }
-    .time { color: #8b949e; font-size: 12px; }
-    .duration { color: #8b949e; }
+    [data-theme="dark"] .params code { color: #d7e1ef; }
+    .time { color: var(--text-muted); font-size: 12px; }
+    .duration { color: var(--text-muted); }
     .expandable { cursor: pointer; }
     .expanded .params {
       white-space: pre-wrap;
@@ -113,30 +248,33 @@ const baseStyles = `
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
       margin-top: 20px;
     }
     .pagination .btn {
       display: inline-block;
-      background: #30363d;
-      color: #c9d1d9;
-      padding: 8px 16px;
-      border-radius: 6px;
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
       text-decoration: none;
-      font-size: 14px;
+      font-size: 13px;
+      border: 1px solid var(--border);
     }
-    .pagination .btn:hover:not(.disabled) { background: #484f58; }
+    .pagination .btn:hover:not(.disabled) { background: var(--panel-muted); }
     .pagination .btn.disabled { opacity: 0.5; cursor: not-allowed; }
-    .pagination .page-info { color: #8b949e; }
+    .pagination .page-info { color: var(--text-muted); font-size: 12px; }
     #notifications {
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
     .notification {
-      background: #161b22;
-      border: 2px solid #d29922;
-      border-radius: 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--warning);
+      border-radius: 10px;
       padding: 16px;
       margin-bottom: 12px;
+      box-shadow: var(--shadow);
     }
     .notification .header {
       display: flex;
@@ -145,15 +283,15 @@ const baseStyles = `
       margin-bottom: 8px;
     }
     .notification .title {
-      font-weight: bold;
-      color: #d29922;
+      font-weight: 600;
+      color: var(--text-strong);
     }
     .notification-nav {
       display: flex;
       align-items: center;
       gap: 8px;
       font-size: 12px;
-      color: #8b949e;
+      color: var(--text-muted);
     }
     .notification-nav button {
       padding: 4px 8px;
@@ -164,7 +302,7 @@ const baseStyles = `
       cursor: not-allowed;
     }
     .notification .meta {
-      color: #8b949e;
+      color: var(--text-muted);
       font-size: 12px;
       margin-bottom: 12px;
     }
@@ -175,11 +313,11 @@ const baseStyles = `
     }
     .ws-status {
       font-size: 12px;
-      color: #8b949e;
+      color: var(--text-muted);
       margin-left: 12px;
     }
-    .ws-status.connected { color: #3fb950; }
-    .ws-status.disconnected { color: #f85149; }
+    .ws-status.connected { color: var(--success); }
+    .ws-status.disconnected { color: var(--error); }
 `;
 
 export function renderPage(
@@ -199,79 +337,115 @@ export function renderPage(
   <style>${baseStyles}</style>
 </head>
 <body>
-  <h1>toolwatch <span id="wsStatus" class="ws-status disconnected">disconnected</span></h1>
-
-  <div id="notifications"></div>
-
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-value">${stats.total}</div>
-      <div class="stat-label">Total Calls</div>
+  <div class="page">
+    <div class="page-header">
+      <h1>toolwatch <span id="wsStatus" class="ws-status disconnected">disconnected</span></h1>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15.5A9 9 0 1 1 12.5 3a7 7 0 0 0 8.5 12.5Z"></path>
+        </svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M19.4 4.6l-2.1 2.1M6.7 17.3l-2.1 2.1"></path>
+        </svg>
+      </button>
     </div>
-    <div class="stat">
-      <div class="stat-value">${stats.users}</div>
-      <div class="stat-label">Users</div>
+
+    <div id="notifications"></div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">${stats.total}</div>
+        <div class="stat-label">Total Calls</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${stats.users}</div>
+        <div class="stat-label">Users</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${stats.tools}</div>
+        <div class="stat-label">Tools</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${stats.errors}</div>
+        <div class="stat-label">Errors</div>
+      </div>
     </div>
-    <div class="stat">
-      <div class="stat-value">${stats.tools}</div>
-      <div class="stat-label">Tools</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value">${stats.errors}</div>
-      <div class="stat-label">Errors</div>
-    </div>
-  </div>
 
-  <form class="filters" method="GET">
-    <select name="user">
-      <option value="">All Users</option>
-      ${filters.users.map((u) => `<option value="${esc(u)}" ${currentFilter.user === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
-    </select>
-    <select name="tool">
-      <option value="">All Tools</option>
-      ${filters.tools.map((t) => `<option value="${esc(t)}" ${currentFilter.tool === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
-    </select>
-    <select name="model">
-      <option value="">All Models</option>
-      ${filters.models.map((m) => `<option value="${esc(m)}" ${currentFilter.model === m ? "selected" : ""}>${esc(m)}</option>`).join("")}
-    </select>
-    <select name="isError">
-      <option value="">All Results</option>
-      <option value="true" ${currentFilter.isError === true ? "selected" : ""}>Errors Only</option>
-      <option value="false" ${currentFilter.isError === false ? "selected" : ""}>Success Only</option>
-    </select>
-    <select name="approval">
-      <option value="">All Approvals</option>
-      <option value="approved" ${currentFilter.approvalStatus === "approved" ? "selected" : ""}>Approved</option>
-      <option value="denied" ${currentFilter.approvalStatus === "denied" ? "selected" : ""}>Denied</option>
-      <option value="pending" ${currentFilter.approvalStatus === "pending" ? "selected" : ""}>Pending</option>
-    </select>
-    <input type="text" name="search" placeholder="Search params..." value="${esc(currentFilter.search ?? "")}" />
-    <button type="submit">Filter</button>
-    <a href="/"><button type="button" class="secondary">Clear</button></a>
-  </form>
+    <form class="filters" method="GET">
+      <select name="user">
+        <option value="">All Users</option>
+        ${filters.users.map((u) => `<option value="${esc(u)}" ${currentFilter.user === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
+      </select>
+      <select name="tool">
+        <option value="">All Tools</option>
+        ${filters.tools.map((t) => `<option value="${esc(t)}" ${currentFilter.tool === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
+      </select>
+      <select name="model">
+        <option value="">All Models</option>
+        ${filters.models.map((m) => `<option value="${esc(m)}" ${currentFilter.model === m ? "selected" : ""}>${esc(m)}</option>`).join("")}
+      </select>
+      <select name="isError">
+        <option value="">All Results</option>
+        <option value="true" ${currentFilter.isError === true ? "selected" : ""}>Errors Only</option>
+        <option value="false" ${currentFilter.isError === false ? "selected" : ""}>Success Only</option>
+      </select>
+      <select name="approval">
+        <option value="">All Approvals</option>
+        <option value="approved" ${currentFilter.approvalStatus === "approved" ? "selected" : ""}>Approved</option>
+        <option value="denied" ${currentFilter.approvalStatus === "denied" ? "selected" : ""}>Denied</option>
+        <option value="pending" ${currentFilter.approvalStatus === "pending" ? "selected" : ""}>Pending</option>
+      </select>
+      <input type="text" name="search" placeholder="Search params..." value="${esc(currentFilter.search ?? "")}" />
+      <button type="submit">Filter</button>
+      <a href="/"><button type="button" class="secondary">Clear</button></a>
+    </form>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>User</th>
-        <th>Tool</th>
-        <th>Model</th>
-        <th>Params</th>
-        <th>Approval</th>
-        <th>Result</th>
-        <th>Duration</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${calls.map((call) => renderRow(call)).join("")}
-    </tbody>
-  </table>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>User</th>
+          <th>Tool</th>
+          <th>Model</th>
+          <th>Params</th>
+          <th>Approval</th>
+          <th>Result</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${calls.map((call) => renderRow(call)).join("")}
+      </tbody>
+    </table>
 
-  ${renderPagination(pagination, currentFilter)}
+    ${renderPagination(pagination, currentFilter)}
 
-  <script>
+    <script>
+      const themeStorageKey = 'toolwatch-theme';
+      const themeToggle = document.getElementById('themeToggle');
+
+      function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem(themeStorageKey, theme);
+        themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+      }
+
+      function getInitialTheme() {
+        const stored = localStorage.getItem(themeStorageKey);
+        if (stored === 'light' || stored === 'dark') {
+          return stored;
+        }
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+
+      const initialTheme = getInitialTheme();
+      applyTheme(initialTheme);
+      themeToggle.addEventListener('click', () => {
+        const nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyTheme(nextTheme);
+      });
+
     // Expand rows on click
     document.querySelectorAll('.expandable').forEach(row => {
       row.addEventListener('click', () => row.classList.toggle('expanded'));
@@ -425,6 +599,7 @@ export function renderPage(
 
     connect();
   </script>
+  </div>
 </body>
 </html>`;
 }
@@ -516,6 +691,7 @@ function renderRow(call: ToolCall): string {
     approvalClass = "warning";
     approvalText = "Pending";
   }
+  const approvalCellClass = approvalTitle ? `${approvalClass} has-tooltip` : approvalClass;
 
   return `
     <tr class="expandable">
@@ -524,7 +700,7 @@ function renderRow(call: ToolCall): string {
       <td class="tool">${esc(call.tool)}</td>
       <td class="model">${esc(call.model)}</td>
       <td class="params"><code title="${esc(paramsFull)}">${esc(paramsDisplay)}</code></td>
-      <td class="${approvalClass}" title="${esc(approvalTitle)}">${esc(approvalText)}</td>
+      <td class="${approvalCellClass}" title="${esc(approvalTitle)}">${esc(approvalText)}</td>
       <td class="${resultClass}">${resultText}</td>
       <td class="duration">${duration}</td>
     </tr>
