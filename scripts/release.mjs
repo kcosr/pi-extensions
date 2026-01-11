@@ -182,7 +182,7 @@ console.log("Creating GitHub release...");
 const releaseNotes = extractReleaseNotes(version);
 const notesFile = join(root, ".release-notes-tmp.md");
 writeFileSync(notesFile, releaseNotes);
-run(`gh release create v${version} --prerelease --title "v${version}" --notes-file "${notesFile}"`);
+run(`gh release create v${version} --title "v${version}" --notes-file "${notesFile}"`);
 run(`rm "${notesFile}"`);
 console.log();
 
