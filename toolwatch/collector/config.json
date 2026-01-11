@@ -1,0 +1,20 @@
+{
+  "rules": [
+    { 
+      "comment": "block dangerous commands", 
+      "match": { "tool": "bash", "params.command": ["/rm\\s+-rf/", "/sudo/", "/shutdown/", "/reboot/"] }, 
+      "action": "deny",
+      "reason": "Dangerous commands (rm -rf, sudo, shutdown, reboot) are not allowed"
+    },
+    { 
+      "comment": "manual approval for env files", 
+      "match": { "params.path": "/\\.env/" }, 
+      "action": "plugin", 
+      "plugin": "manual" 
+    },
+    { "comment": "allow everything else", "action": "allow" }
+  ],
+  "plugins": {
+    "manual": "./plugins/manual.ts"
+  }
+}

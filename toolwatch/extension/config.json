@@ -1,0 +1,13 @@
+{
+  "mode": "http-with-fallback",
+  "http": {
+    "url": "http://localhost:9999/events",
+    "sync": true,
+    "timeoutMs": 30000,
+    "timeoutAction": "block"
+  },
+  "file": {
+    "path": "/tmp/toolwatch.jsonl"
+  },
+  "tools": ["bash", "read", "grep"]
+}

@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+*.jsonl
+
+# Build
+dist/
+
+# Temp
+.release-notes-tmp.md

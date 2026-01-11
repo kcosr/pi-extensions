@@ -1,2 +1,42 @@
 # pi-extensions
-A collection of extensions for badlogic/pi-mono coding agent.
+
+A collection of extensions for the [pi coding agent](https://github.com/badlogic/pi-mono).
+
+## Installation
+
+Extensions can be installed two ways:
+
+**Option 1: Drop in extensions folder**
+
+Copy or symlink to `~/.pi/agent/extensions/`:
+
+```bash
+# Copy
+cp -r ~/pi-extensions/toolwatch/extension ~/.pi/agent/extensions/toolwatch
+
+# Or symlink
+ln -s ~/pi-extensions/toolwatch/extension ~/.pi/agent/extensions/toolwatch
+```
+
+**Option 2: Configure in settings.json**
+
+Add paths to `~/.pi/agent/settings.json`:
+
+```json
+{
+  "extensions": [
+    "/path/to/my-extension",
+    "/path/to/another-extension"
+  ]
+}
+```
+
+Reload pi after installing.
+
+## Extensions
+
+| Extension | Description |
+|-----------|-------------|
+| [toolwatch](toolwatch/) | Tool call auditing and approval system. Log all tool calls to SQLite, block dangerous commands, require manual approval for sensitive operations. |
+
+See each extension's README for configuration details.
