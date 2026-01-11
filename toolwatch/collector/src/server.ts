@@ -100,18 +100,18 @@ export function createServer(db: ToolwatchDB, port: number) {
       // GET /api/calls - query tool calls
       if (req.method === "GET" && url.pathname === "/api/calls") {
         const filter: ToolCallFilter = {
-          user: url.searchParams.get("user") ?? undefined,
-          tool: url.searchParams.get("tool") ?? undefined,
-          model: url.searchParams.get("model") ?? undefined,
-          isError: url.searchParams.has("isError")
+          user: url.searchParams.get("user") || undefined,
+          tool: url.searchParams.get("tool") || undefined,
+          model: url.searchParams.get("model") || undefined,
+          isError: url.searchParams.get("isError")
             ? url.searchParams.get("isError") === "true"
             : undefined,
-          approvalStatus: url.searchParams.get("approval") as ToolCallFilter["approvalStatus"] ?? undefined,
-          search: url.searchParams.get("search") ?? undefined,
-          from: url.searchParams.has("from") ? parseInt(url.searchParams.get("from")!) : undefined,
-          to: url.searchParams.has("to") ? parseInt(url.searchParams.get("to")!) : undefined,
-          limit: url.searchParams.has("limit") ? parseInt(url.searchParams.get("limit")!) : 100,
-          offset: url.searchParams.has("offset") ? parseInt(url.searchParams.get("offset")!) : 0,
+          approvalStatus: url.searchParams.get("approval") as ToolCallFilter["approvalStatus"] || undefined,
+          search: url.searchParams.get("search") || undefined,
+          from: url.searchParams.get("from") ? parseInt(url.searchParams.get("from")!) : undefined,
+          to: url.searchParams.get("to") ? parseInt(url.searchParams.get("to")!) : undefined,
+          limit: url.searchParams.get("limit") ? parseInt(url.searchParams.get("limit")!) : 100,
+          offset: url.searchParams.get("offset") ? parseInt(url.searchParams.get("offset")!) : 0,
         };
 
         const calls = db.query(filter);
@@ -148,14 +148,14 @@ export function createServer(db: ToolwatchDB, port: number) {
           : 0;
 
         const filter: ToolCallFilter = {
-          user: url.searchParams.get("user") ?? undefined,
-          tool: url.searchParams.get("tool") ?? undefined,
-          model: url.searchParams.get("model") ?? undefined,
-          isError: url.searchParams.has("isError")
+          user: url.searchParams.get("user") || undefined,
+          tool: url.searchParams.get("tool") || undefined,
+          model: url.searchParams.get("model") || undefined,
+          isError: url.searchParams.get("isError")
             ? url.searchParams.get("isError") === "true"
             : undefined,
-          approvalStatus: url.searchParams.get("approval") as ToolCallFilter["approvalStatus"] ?? undefined,
-          search: url.searchParams.get("search") ?? undefined,
+          approvalStatus: url.searchParams.get("approval") as ToolCallFilter["approvalStatus"] || undefined,
+          search: url.searchParams.get("search") || undefined,
           limit: limit + 1,  // fetch one extra to detect if there's more
           offset,
         };
