@@ -157,6 +157,7 @@ const baseStyles = `
       font-size: 13px;
       min-width: 140px;
     }
+    input[type="text"]::placeholder { color: var(--text-muted); }
     select:focus, input:focus {
       outline: none;
       border-color: var(--accent-soft);
@@ -209,7 +210,7 @@ const baseStyles = `
     tbody tr:nth-child(even) { background: var(--row-alt); }
     tr:hover { background: var(--row-hover); }
     .tool { color: var(--accent); font-weight: 500; }
-    .user { color: #3f4f63; font-weight: 500; }
+    .user { color: var(--text-muted); font-weight: 500; }
     .model { color: #2f5f55; font-weight: 500; }
     .error { color: var(--error); font-weight: 600; }
     .success { color: var(--success); font-weight: 600; }
