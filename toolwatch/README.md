@@ -2,6 +2,8 @@
 
 Tool call auditing and approval system.
 
+![toolwatch screenshot](screenshot.png)
+
 - **Audit logging** - All tool calls recorded with user, timestamp, model, and parameters
 - **Configurable rules** - JSON-based rules to allow, deny, or require approval
 - **Plugin system** - TypeScript plugins for custom approval logic
