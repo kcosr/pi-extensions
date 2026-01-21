@@ -7,6 +7,7 @@
 ### Added
 
 ### Changed
+- **codemap**: Add a parent view so the project directory can be selected by name (via `..`)
 
 ### Fixed
 
