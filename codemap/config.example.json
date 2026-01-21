@@ -1,0 +1,5 @@
+{
+  "tokenBudget": 15000,
+  "respectGitignore": true,
+  "shareWithAgent": true
+}

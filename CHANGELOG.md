@@ -5,6 +5,7 @@
 ### Breaking Changes
 
 ### Added
+- **codemap**: Added codemap extension
 
 ### Changed
 
