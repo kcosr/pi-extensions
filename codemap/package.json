@@ -1,6 +1,6 @@
 {
   "name": "codemap",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "File browser for selecting files/directories to pass to codemap in pi",
   "main": "index.ts",
   "repository": {
