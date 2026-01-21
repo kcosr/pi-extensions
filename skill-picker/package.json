@@ -1,12 +1,12 @@
 {
-	"name": "skill-picker",
-	"version": "1.0.0",
-	"description": "Command palette for selecting and queueing skills in pi",
-	"main": "index.ts",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/kcosr/pi-extensions"
-	},
-	"author": "kcosr (forked from nicobailon/pi-skill-palette)",
-	"license": "MIT"
+  "name": "skill-picker",
+  "version": "0.1.0",
+  "description": "Command palette for selecting and queueing skills in pi",
+  "main": "index.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kcosr/pi-extensions"
+  },
+  "author": "kcosr (forked from nicobailon/pi-skill-palette)",
+  "license": "MIT"
 }
