@@ -1,6 +1,7 @@
 /**
- * pi-skill-palette
+ * skill-picker
  *
+ * Hard fork of pi-skill-palette (MIT) by @nicobailon.
  * A VS Code/Amp-style command palette for quickly selecting and applying skills.
  * Usage: /skill - Opens the skill picker overlay
  *
@@ -85,7 +86,7 @@ const DEFAULT_THEME: PaletteTheme = {
 };
 
 function loadTheme(): PaletteTheme {
-	const configPath = path.join(os.homedir(), ".pi", "agent", "extensions", "pi-skill-palette", "theme.json");
+	const configPath = path.join(os.homedir(), ".pi", "agent", "extensions", "skill-picker", "theme.json");
 	try {
 		if (fs.existsSync(configPath)) {
 			const content = fs.readFileSync(configPath, "utf-8");
@@ -335,7 +336,7 @@ class ConfirmDialog {
 	constructor(
 		private titleText: string,
 		private subjectText: string,
-		private done: (confirmed: boolean) => void
+		private done: (result: "remove" | "keep" | "back") => void
 	) {}
 
 	private cleanup(): void {}
@@ -343,13 +344,13 @@ class ConfirmDialog {
 	handleInput(data: string): void {
 		if (matchesKey(data, "escape")) {
 			this.cleanup();
-			this.done(true);
+			this.done("back"); // Go back to skill palette
 			return;
 		}
 
 		if (matchesKey(data, "return")) {
 			this.cleanup();
-			this.done(this.selected === 0);
+			this.done(this.selected === 0 ? "remove" : "keep");
 			return;
 		}
 
@@ -360,13 +361,13 @@ class ConfirmDialog {
 
 		if (data === "y" || data === "Y") {
 			this.cleanup();
-			this.done(true);
+			this.done("remove");
 			return;
 		}
 
 		if (data === "n" || data === "N") {
 			this.cleanup();
-			this.done(false);
+			this.done("keep");
 			return;
 		}
 	}
@@ -747,50 +748,61 @@ export default function skillPaletteExtension(pi: ExtensionAPI): void {
 				return;
 			}
 
-			// Show the overlay and wait for result
-			const result = await ctx.ui.custom<{ skill: Skill | null; action: "select" | "cancel" | "clear-confirm" }>(
-				(_tui, _theme, _keybindings, done) => new SkillPaletteComponent(
-					skills,
-					state.queuedSkills,
-					(skill, queued) => {
-						if (queued) {
-							if (!state.queuedSkills.find((item) => item.name === skill.name)) {
-								state.queuedSkills.push(skill);
-							}
-						} else {
-							state.queuedSkills = state.queuedSkills.filter((item) => item.name !== skill.name);
-						}
-						const summary = formatQueuedSummary(state.queuedSkills);
-						ctx.ui.setStatus("skill", summary.status);
-						ctx.ui.setWidget("skill", summary.widget);
-					},
-					(skill, action) => done({ skill, action })
-				),
-				{ overlay: true }
-			);
+			let showPalette = true;
 
-			if (result.action === "select" && result.skill) {
-				if (!state.queuedSkills.find((skill) => skill.name === result.skill!.name)) {
-					state.queuedSkills.push(result.skill);
-				}
-				const summary = formatQueuedSummary(state.queuedSkills);
-				ctx.ui.setStatus("skill", summary.status);
-				ctx.ui.setWidget("skill", summary.widget);
-				ctx.ui.notify(`Skill queued: ${result.skill.name}`, "info");
-			} else if (result.action === "clear-confirm") {
-				const confirmed = await ctx.ui.custom<boolean>(
-					(tui, _theme, _keybindings, done) => {
-						const dialog = new ConfirmDialog("Clear Queued Skills", "All queued skills", done);
-						return dialog;
-					},
+			while (showPalette) {
+				// Show the overlay and wait for result
+				const result = await ctx.ui.custom<{ skill: Skill | null; action: "select" | "cancel" | "clear-confirm" }>(
+					(_tui, _theme, _keybindings, done) => new SkillPaletteComponent(
+						skills,
+						state.queuedSkills,
+						(skill, queued) => {
+							if (queued) {
+								if (!state.queuedSkills.find((item) => item.name === skill.name)) {
+									state.queuedSkills.push(skill);
+								}
+							} else {
+								state.queuedSkills = state.queuedSkills.filter((item) => item.name !== skill.name);
+							}
+							const summary = formatQueuedSummary(state.queuedSkills);
+							ctx.ui.setStatus("skill", summary.status);
+							ctx.ui.setWidget("skill", summary.widget);
+						},
+						(skill, action) => done({ skill, action })
+					),
 					{ overlay: true }
 				);
 
-				if (confirmed) {
-					state.queuedSkills = [];
-					ctx.ui.setStatus("skill", undefined);
-					ctx.ui.setWidget("skill", undefined);
-					ctx.ui.notify("Queued skills cleared", "info");
+				if (result.action === "select" && result.skill) {
+					if (!state.queuedSkills.find((skill) => skill.name === result.skill!.name)) {
+						state.queuedSkills.push(result.skill);
+					}
+					const summary = formatQueuedSummary(state.queuedSkills);
+					ctx.ui.setStatus("skill", summary.status);
+					ctx.ui.setWidget("skill", summary.widget);
+					ctx.ui.notify(`Skill queued: ${result.skill.name}`, "info");
+					showPalette = false;
+				} else if (result.action === "clear-confirm") {
+					const dialogResult = await ctx.ui.custom<"remove" | "keep" | "back">(
+						(_tui, _theme, _keybindings, done) => {
+							return new ConfirmDialog("Clear Queued Skills", "All queued skills", done);
+						},
+						{ overlay: true }
+					);
+
+					if (dialogResult === "remove") {
+						state.queuedSkills = [];
+						ctx.ui.setStatus("skill", undefined);
+						ctx.ui.setWidget("skill", undefined);
+						ctx.ui.notify("Queued skills cleared", "info");
+						showPalette = false;
+					} else if (dialogResult === "keep") {
+						showPalette = false;
+					}
+					// dialogResult === "back" continues the loop
+				} else {
+					// "cancel"
+					showPalette = false;
 				}
 			}
 		},

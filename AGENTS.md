@@ -8,6 +8,7 @@ pi-extensions is a collection of extensions for the [pi coding agent](https://gi
 
 | Extension | Description |
 |-----------|-------------|
+| [codemap](codemap/) | File browser for selecting files/directories to pass to codemap |
 | [skill-picker](skill-picker/) | Command palette for selecting and queueing skills |
 | [toolwatch](toolwatch/) | Tool call auditing and approval system |
 

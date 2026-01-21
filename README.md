@@ -18,6 +18,12 @@ cp -r ~/pi-extensions/toolwatch/extension ~/.pi/agent/extensions/toolwatch
 ln -s ~/pi-extensions/toolwatch/extension ~/.pi/agent/extensions/toolwatch
 ```
 
+For extensions that live directly in this repo (e.g., `codemap/`, `skill-picker/`), copy the folder itself:
+
+```bash
+cp -r ~/pi-extensions/codemap ~/.pi/agent/extensions/codemap
+```
+
 **Option 2: Configure in settings.json**
 
 Add paths to `~/.pi/agent/settings.json`:
@@ -37,6 +43,7 @@ Reload pi after installing.
 
 | Extension | Description |
 |-----------|-------------|
+| [codemap](codemap/) | File browser for selecting files/directories to pass to `codemap` via `/codemap`. |
 | [skill-picker](skill-picker/) | Command palette for selecting and queueing skills explicitly via `/skill` command. Hard fork of [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette). |
 | [toolwatch](toolwatch/) | Tool call auditing and approval system. Log all tool calls to SQLite, block dangerous commands, require manual approval for sensitive operations. |
 
