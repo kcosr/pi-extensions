@@ -37,6 +37,7 @@ Reload pi after installing.
 
 | Extension | Description |
 |-----------|-------------|
+| [skill-picker](skill-picker/) | Command palette for selecting and queueing skills explicitly via `/skill` command. Hard fork of [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette). |
 | [toolwatch](toolwatch/) | Tool call auditing and approval system. Log all tool calls to SQLite, block dangerous commands, require manual approval for sensitive operations. |
 
 See each extension's README for configuration details.

@@ -5,8 +5,19 @@
 ### Breaking Changes
 
 ### Added
+- **skill-picker**: Hard fork of [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette) (MIT), adapted for pi-extensions.
+- **skill-picker**: Queues multiple skills and injects them together on the next message.
+- **skill-picker**: Spacebar quick toggle for add/remove without closing the palette.
+- **skill-picker**: Clear-queued confirmation when pressing Esc with queued skills.
+- **skill-picker**: Loads skills from Codex/Claude/Pi directories (recursive + Claude one-level format).
 
 ### Changed
+- **skill-picker**: Enter adds the selected skill (if missing) and closes the palette.
+- **skill-picker**: Footer hints now reflect add/remove/toggle behavior and clear on Esc.
+- **skill-picker**: Scroll indicator simplified to a left-aligned count.
+
+### Removed
+- **skill-picker**: Confirmation dialog countdown timer and progress dots.
 
 ### Fixed
 

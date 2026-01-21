@@ -2,12 +2,13 @@
 
 ## Overview
 
-pi-extensions is a collection of extensions for the pi coding agent.
+pi-extensions is a collection of extensions for the [pi coding agent](https://github.com/badlogic/pi-mono). See the pi-mono repository for context and instructions on writing extensions.
 
 ## Extensions
 
 | Extension | Description |
 |-----------|-------------|
+| [skill-picker](skill-picker/) | Command palette for selecting and queueing skills |
 | [toolwatch](toolwatch/) | Tool call auditing and approval system |
 
 ## Commands
