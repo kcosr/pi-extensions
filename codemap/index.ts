@@ -570,6 +570,7 @@ class FileBrowserComponent {
 	selectedPaths: Set<string>;
 	inactivityTimeout: ReturnType<typeof setTimeout> | null = null;
 	static readonly INACTIVITY_MS = 60000;
+	rootParentView = false;
 	
 	// Git support
 	inGitRepo: boolean;
@@ -601,6 +602,7 @@ class FileBrowserComponent {
 		this.cwdRoot = getCwdRoot();
 		this.currentDir = this.cwdRoot;
 		this.selectedPaths = new Set(initialSelectedPaths);
+		this.rootParentView = false;
 		
 		// Check if we're in a git repo
 		this.inGitRepo = isGitRepo(this.cwdRoot);
@@ -662,16 +664,22 @@ class FileBrowserComponent {
 	}
 
 	listCurrentDirectory(): FileEntry[] {
+		if (this.rootParentView) {
+			return [{
+				name: path.basename(this.cwdRoot),
+				isDirectory: true,
+				relativePath: ".",
+			}];
+		}
+		
 		const entries = listDirectoryWithGit(this.currentDir, this.cwdRoot, this.gitFiles);
 		
-		// Add ".." entry at top if not at root
-		if (this.currentDir !== this.cwdRoot) {
-			entries.unshift({
-				name: "..",
-				isDirectory: true,
-				relativePath: "..",
-			});
-		}
+		// Add ".." entry at top (shows parent view at root)
+		entries.unshift({
+			name: "..",
+			isDirectory: true,
+			relativePath: "..",
+		});
 		
 		return entries;
 	}
@@ -691,6 +699,7 @@ class FileBrowserComponent {
 	navigateTo(dir: string): void {
 		if (!isWithinCwd(dir, this.cwdRoot)) return;
 
+		this.rootParentView = false;
 		this.currentDir = dir;
 		this.allEntries = this.listCurrentDirectory();
 		this.query = "";
@@ -700,6 +709,18 @@ class FileBrowserComponent {
 	}
 
 	goUp(): boolean {
+		if (this.rootParentView) {
+			return false;
+		}
+		if (this.currentDir === this.cwdRoot) {
+			this.rootParentView = true;
+			this.allEntries = this.listCurrentDirectory();
+			this.query = "";
+			this.isSearchMode = false;
+			this.filtered = this.allEntries;
+			this.selected = 0;
+			return true;
+		}
 		const parentDir = path.dirname(this.currentDir);
 		if (isWithinCwd(parentDir, this.cwdRoot)) {
 			this.navigateTo(parentDir);
@@ -838,12 +859,12 @@ class FileBrowserComponent {
 				if (entry.name === "..") {
 					// Go up entry
 					this.goUp();
-				} else if (entry.isDirectory) {
-					// Enter the directory
+				} else if (entry.isDirectory && (entry.relativePath !== "." || this.rootParentView)) {
+					// Enter the directory (or enter root from parent view)
 					const targetPath = path.join(this.cwdRoot, entry.relativePath);
 					this.navigateTo(targetPath);
 				} else {
-					// Toggle file selection
+					// Toggle selection (files, or root entry when selecting)
 					const willSelect = !this.selectedPaths.has(entry.relativePath);
 					if (willSelect) {
 						this.selectedPaths.add(entry.relativePath);
@@ -952,6 +973,8 @@ class FileBrowserComponent {
 		let titleText: string;
 		if (this.isSearchMode) {
 			titleText = ` Search `;
+		} else if (this.rootParentView) {
+			titleText = "";
 		} else {
 			const relDir = path.relative(this.cwdRoot, this.currentDir);
 			titleText = relDir ? ` ${truncate(relDir, 40)} ` : "";

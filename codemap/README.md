@@ -29,6 +29,8 @@ When you are done selecting:
 - Press `Esc` at the project root to populate the editor with the command
 - Press `Enter` to execute it
 
+On first open, you start inside the project. Use the `..` entry at the top to move to the parent view (showing the project directory name for selecting the entire project), then `Enter` to return inside.
+
 The command uses:
 - `!codemap ...` when **Share with agent** is enabled
 - `!!codemap ...` when **Share with agent** is disabled
