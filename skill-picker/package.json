@@ -1,6 +1,6 @@
 {
   "name": "skill-picker",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Command palette for selecting and queueing skills in pi",
   "main": "index.ts",
   "repository": {

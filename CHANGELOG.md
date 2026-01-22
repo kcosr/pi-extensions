@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.2] - 2026-01-22
 
 ### Added
 - **codemap**: Add stats summary modal in the options panel (Dry run stats) using codemap JSON stats output
