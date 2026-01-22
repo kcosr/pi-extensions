@@ -2,45 +2,20 @@
 
 ## [Unreleased]
 
-### Breaking Changes
-
 ### Added
-
-### Changed
-
-### Fixed
-
-### Removed
+- **codemap**: Add stats summary modal in the options panel (Dry run stats) using codemap JSON stats output
 
 ## [0.2.1] - 2026-01-21
-
-### Breaking Changes
-
-### Added
 
 ### Changed
 - **codemap**: Add a parent view so the project directory can be selected by name (via `..`)
 
-### Fixed
-
-### Removed
-
 ## [0.2.0] - 2026-01-21
-
-### Breaking Changes
 
 ### Added
 - **codemap**: Added codemap extension
 
-### Changed
-
-### Fixed
-
-### Removed
-
 ## [0.1.0] - 2026-01-21
-
-### Breaking Changes
 
 ### Added
 - **skill-picker**: Hard fork of [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette) (MIT), adapted for pi-extensions.
@@ -56,11 +31,6 @@
 
 ### Removed
 - **skill-picker**: Confirmation dialog countdown timer and progress dots.
-
-### Fixed
-
-### Removed
-
 
 ## [0.0.1] - 2026-01-10
 

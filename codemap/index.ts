@@ -37,6 +37,36 @@ interface CodemapConfig {
 	shareWithAgent?: boolean;
 }
 
+interface CodemapStatsPayload {
+	stats: {
+		totalFiles: number;
+		totalSymbols: number;
+		byLanguage: Record<string, number>;
+		bySymbolKind: Record<string, number>;
+	};
+	total_tokens?: number;
+	codebase_tokens?: number;
+}
+
+interface CodemapStats {
+	totalFiles: number;
+	totalSymbols: number;
+	byLanguage: Record<string, number>;
+	bySymbolKind: Record<string, number>;
+	totalTokens?: number;
+	codebaseTokens?: number;
+}
+
+interface CodemapStatsResult {
+	stats?: CodemapStats;
+	error?: string;
+}
+
+type FileBrowserAction =
+	| { action: "confirm" }
+	| { action: "cancel" }
+	| { action: "stats"; result: CodemapStatsResult; scopeLabel: string };
+
 const DEFAULT_CONFIG: CodemapConfig = {
 	tokenBudget: 15000,
 	respectGitignore: true,
@@ -92,21 +122,95 @@ function pathsToCodemapArgs(paths: string[]): string[] {
 	});
 }
 
+function quoteCodemapArg(arg: string): string {
+	// Use single quotes for globs to prevent shell expansion
+	if (/[*?[\]]/.test(arg)) {
+		return `'${arg}'`;
+	}
+	// Use double quotes for paths with spaces
+	if (arg.includes(" ")) {
+		return `"${arg}"`;
+	}
+	return arg;
+}
+
+function buildCodemapArgs(paths: string[], tokenBudget: number | null = state.tokenBudget): string[] {
+	const args: string[] = [];
+	if (tokenBudget !== null) {
+		args.push("-b", String(tokenBudget));
+	}
+	return args.concat(pathsToCodemapArgs(paths));
+}
+
 function formatCommand(paths: string[], tokenBudget: number | null = state.tokenBudget): string {
-	const args = pathsToCodemapArgs(paths);
-	const quotedArgs = args.map(p => {
-		// Use single quotes for globs to prevent shell expansion
-		if (/[*?[\]]/.test(p)) {
-			return `'${p}'`;
+	const quotedArgs = buildCodemapArgs(paths, tokenBudget).map(quoteCodemapArg);
+	return quotedArgs.length > 0 ? `codemap ${quotedArgs.join(" ")}` : "codemap";
+}
+
+function formatStatsCommand(paths: string[], tokenBudget: number | null = state.tokenBudget): string {
+	const quotedArgs = buildCodemapArgs(paths, tokenBudget).map(quoteCodemapArg);
+	const parts = ["codemap", "--stats-only", "--output", "json", ...quotedArgs];
+	return parts.join(" ").trim();
+}
+
+function formatExecError(error: unknown): string {
+	if (error instanceof Error) {
+		const errorWithStderr = error as Error & { stderr?: Buffer | string };
+		if (errorWithStderr.stderr) {
+			const stderrText = typeof errorWithStderr.stderr === "string"
+				? errorWithStderr.stderr
+				: errorWithStderr.stderr.toString("utf-8");
+			if (stderrText.trim()) {
+				return stderrText.trim();
+			}
 		}
-		// Use double quotes for paths with spaces
-		if (p.includes(" ")) {
-			return `"${p}"`;
+		return error.message;
+	}
+	return String(error);
+}
+
+function fetchCodemapStats(paths: string[], tokenBudget: number | null): CodemapStatsResult {
+	const command = formatStatsCommand(paths, tokenBudget);
+	try {
+		const output = execSync(command, {
+			cwd: getCwdRoot(),
+			encoding: "utf-8",
+			stdio: "pipe",
+			maxBuffer: 20 * 1024 * 1024,
+		});
+		const trimmed = output.trim();
+		if (!trimmed) {
+			return { error: "codemap returned no output." };
 		}
-		return p;
-	}).join(" ");
-	const budgetFlag = tokenBudget !== null ? `-b ${tokenBudget} ` : "";
-	return `codemap ${budgetFlag}${quotedArgs}`;
+		const parsed = JSON.parse(trimmed) as CodemapStatsPayload;
+		if (!parsed.stats) {
+			return { error: "codemap output missing stats." };
+		}
+		return {
+			stats: {
+				totalFiles: parsed.stats.totalFiles,
+				totalSymbols: parsed.stats.totalSymbols,
+				byLanguage: parsed.stats.byLanguage ?? {},
+				bySymbolKind: parsed.stats.bySymbolKind ?? {},
+				totalTokens: parsed.total_tokens,
+				codebaseTokens: parsed.codebase_tokens,
+			},
+		};
+	} catch (error) {
+		return { error: formatExecError(error) };
+	}
+}
+
+function formatStatsScope(paths: string[]): string {
+	if (paths.length === 0) {
+		return "Current directory";
+	}
+	if (paths.length === 1) {
+		return paths[0];
+	}
+	const preview = paths.slice(0, 2).join(", ");
+	const suffix = paths.length > 2 ? ", ..." : "";
+	return `${paths.length} paths (${preview}${suffix})`;
 }
 
 function formatSelectedSummary(paths: string[]): { widget?: string[] } {
@@ -548,6 +652,7 @@ interface BrowserOption {
 	label: string;
 	enabled: boolean;
 	visible: () => boolean;
+	kind?: "toggle" | "action";
 	// For input options
 	hasInput?: boolean;
 	inputValue?: string;
@@ -569,6 +674,8 @@ class FileBrowserComponent {
 	isSearchMode = false; // True when showing search results
 	selectedPaths: Set<string>;
 	inactivityTimeout: ReturnType<typeof setTimeout> | null = null;
+	statsTimeout: ReturnType<typeof setTimeout> | null = null;
+	statsLoading = false;
 	static readonly INACTIVITY_MS = 60000;
 	rootParentView = false;
 	
@@ -585,7 +692,7 @@ class FileBrowserComponent {
 	// Callbacks
 	onToggle: (relativePath: string, selected: boolean) => void;
 	onOptionChange: (optionId: string, enabled: boolean, value?: string) => void;
-	done: (action: "confirm" | "cancel") => void;
+	done: (action: FileBrowserAction) => void;
 
 	constructor(
 		initialSelectedPaths: string[],
@@ -594,7 +701,7 @@ class FileBrowserComponent {
 		initialShareWithAgent: boolean,
 		onToggle: (relativePath: string, selected: boolean) => void,
 		onOptionChange: (optionId: string, enabled: boolean, value?: string) => void,
-		done: (action: "confirm" | "cancel") => void
+		done: (action: FileBrowserAction) => void
 	) {
 		this.onToggle = onToggle;
 		this.onOptionChange = onOptionChange;
@@ -629,6 +736,13 @@ class FileBrowserComponent {
 				label: "Share with agent",
 				enabled: initialShareWithAgent,
 				visible: () => true,
+			},
+			{
+				id: "stats",
+				label: "Show dry run stats",
+				enabled: true,
+				visible: () => true,
+				kind: "action",
 			},
 		];
 		
@@ -692,7 +806,7 @@ class FileBrowserComponent {
 		if (this.inactivityTimeout) clearTimeout(this.inactivityTimeout);
 		this.inactivityTimeout = setTimeout(() => {
 			this.cleanup();
-			this.done("cancel");
+			this.done({ action: "cancel" });
 		}, FileBrowserComponent.INACTIVITY_MS);
 	}
 
@@ -731,6 +845,10 @@ class FileBrowserComponent {
 
 	handleInput(data: string): void {
 		this.resetInactivityTimeout();
+
+		if (this.statsLoading) {
+			return;
+		}
 
 		// Tab switches focus between search/files and options panel
 		if (matchesKey(data, "tab")) {
@@ -811,7 +929,7 @@ class FileBrowserComponent {
 
 		if (data === " ") {
 			// Space toggles the checkbox
-			if (currentOption) {
+			if (currentOption && currentOption.kind !== "action") {
 				currentOption.enabled = !currentOption.enabled;
 				if (currentOption.id === "gitignore") {
 					this.rebuildFileLists();
@@ -822,7 +940,26 @@ class FileBrowserComponent {
 		}
 
 		if (matchesKey(data, "return")) {
-			// Enter: for input options, enter edit mode; otherwise toggle
+			// Enter: for action options, run; for input options, enter edit mode; otherwise toggle
+			if (currentOption?.kind === "action") {
+				if (this.statsLoading) {
+					return;
+				}
+				this.statsLoading = true;
+				if (this.inactivityTimeout) {
+					clearTimeout(this.inactivityTimeout);
+					this.inactivityTimeout = null;
+				}
+				const paths = Array.from(this.selectedPaths);
+				const tokenBudget = state.tokenBudget;
+				const scopeLabel = formatStatsScope(paths);
+				this.statsTimeout = setTimeout(() => {
+					const result = fetchCodemapStats(paths, tokenBudget);
+					this.cleanup();
+					this.done({ action: "stats", result, scopeLabel });
+				}, 0);
+				return;
+			}
 			if (currentOption?.hasInput) {
 				this.editingInput = true;
 			} else if (currentOption) {
@@ -848,7 +985,7 @@ class FileBrowserComponent {
 			// Esc goes up one directory, or closes if at root
 			if (!this.goUp()) {
 				this.cleanup();
-				this.done("confirm");
+				this.done({ action: "confirm" });
 			}
 			return;
 		}
@@ -1002,19 +1139,37 @@ class FileBrowserComponent {
 			if (this.editingInput) {
 				optionsHint = hint(" (type value, enter/esc to finish)");
 			} else if (this.focusOnOptions) {
-				optionsHint = hint(" (↑↓ nav, space toggle, enter edit, tab exit)");
+				optionsHint = hint(" (↑↓ nav, space toggle, enter select/edit, tab exit)");
 			} else {
 				optionsHint = hint(" (tab to focus)");
 			}
 			const optionsLabel = this.focusOnOptions ? selected("Options") : hint("Options");
 			lines.push(row(optionsLabel + optionsHint));
 			
+			const firstActionIndex = visibleOptions.findIndex(opt => opt.kind === "action");
 			for (let i = 0; i < visibleOptions.length; i++) {
+				if (i === firstActionIndex && firstActionIndex > 0) {
+					lines.push(emptyRow());
+				}
+
 				const opt = visibleOptions[i];
 				const isSelectedOpt = this.focusOnOptions && i === this.selectedOption;
+				const isAction = opt.kind === "action";
+
+				if (isAction) {
+					const prefix = isSelectedOpt ? selected("▸") : " ";
+					const label = isSelectedOpt ? selectedText(opt.label) : opt.label;
+					const loading = this.statsLoading ? hint(italic("Generating...")) : "";
+					const loadingGap = loading ? " " : "";
+					lines.push(row(`${prefix} ${label}${loadingGap}${loading}`));
+					continue;
+				}
+
 				const checkbox = opt.enabled ? checked("☑") : hint("☐");
 				const prefix = isSelectedOpt ? selected("▸ ") : "  ";
-				const label = isSelectedOpt ? selectedText(opt.label) : (opt.enabled ? opt.label : hint(opt.label));
+				const label = isSelectedOpt
+					? selectedText(opt.label)
+					: (opt.enabled ? opt.label : hint(opt.label));
 				
 				// Render input field if present
 				let inputDisplay = "";
@@ -1137,6 +1292,11 @@ class FileBrowserComponent {
 			clearTimeout(this.inactivityTimeout);
 			this.inactivityTimeout = null;
 		}
+		if (this.statsTimeout) {
+			clearTimeout(this.statsTimeout);
+			this.statsTimeout = null;
+		}
+		this.statsLoading = false;
 	}
 
 	invalidate(): void {}
@@ -1144,6 +1304,134 @@ class FileBrowserComponent {
 	dispose(): void {
 		this.cleanup();
 	}
+}
+
+class StatsDialog {
+	readonly width = 72;
+
+	constructor(
+		private result: CodemapStatsResult,
+		private scopeLabel: string,
+		private done: (action: "close") => void
+	) {}
+
+	handleInput(data: string): void {
+		if (matchesKey(data, "escape") || matchesKey(data, "return") || data === "q" || data === "Q") {
+			this.done("close");
+		}
+	}
+
+	render(width: number): string[] {
+		const w = this.width > 0 ? Math.min(this.width, width) : width;
+		const innerW = Math.max(0, w - 2);
+		const lines: string[] = [];
+
+		const t = paletteTheme;
+		const border = (s: string) => fg(t.border, s);
+		const title = (s: string) => fg(t.title, s);
+		const accent = (s: string) => fg(t.selected, s);
+		const hint = (s: string) => fg(t.hint, s);
+		const muted = (s: string) => fg(t.placeholder, s);
+		const bold = (s: string) => `\x1b[1m${s}\x1b[22m`;
+		const italic = (s: string) => `\x1b[3m${s}\x1b[23m`;
+
+		const visLen = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "").length;
+
+		const pad = (s: string, len: number) => s + " ".repeat(Math.max(0, len - visLen(s)));
+		const row = (content: string) => border("│") + pad(" " + content, innerW) + border("│");
+		const emptyRow = () => border("│") + " ".repeat(innerW) + border("│");
+		const center = (s: string, len: number) => {
+			const padding = Math.max(0, len - visLen(s));
+			const left = Math.floor(padding / 2);
+			return " ".repeat(left) + s + " ".repeat(padding - left);
+		};
+		const centerRow = (content: string) => border("│") + center(content, innerW) + border("│");
+
+		const titleText = " Codemap Stats ";
+		const borderLen = Math.max(0, innerW - visLen(titleText));
+		const leftBorder = Math.floor(borderLen / 2);
+		const rightBorder = borderLen - leftBorder;
+		lines.push(border("╭" + "─".repeat(leftBorder)) + title(titleText) + border("─".repeat(rightBorder) + "╮"));
+
+		lines.push(emptyRow());
+
+		const closeHint = hint(`${italic("esc")} / ${italic("enter")} close`);
+		const scopeText = this.scopeLabel.length > innerW - 8
+			? this.scopeLabel.slice(0, Math.max(0, innerW - 9)) + "…"
+			: this.scopeLabel;
+		const stats = this.result.stats;
+
+		if (this.result.error || !stats) {
+			const message = this.result.error ? this.result.error : "No stats available.";
+			lines.push(centerRow(`${accent("⚠")} ${bold("Stats unavailable")}`));
+			lines.push(emptyRow());
+			lines.push(row(muted(message)));
+			lines.push(emptyRow());
+			lines.push(border("├" + "─".repeat(innerW) + "┤"));
+			lines.push(centerRow(closeHint));
+			lines.push(border(`╰${"─".repeat(innerW)}╯`));
+			return lines;
+		}
+
+		const formatNumber = (value: number) => value.toLocaleString();
+
+		lines.push(row(`${hint("Scope:")} ${bold(scopeText)}`));
+		lines.push(emptyRow());
+
+		lines.push(border("├" + "─".repeat(innerW) + "┤"));
+		lines.push(row(bold("Summary")));
+		lines.push(row(`${hint("Total files:")} ${accent(formatNumber(stats.totalFiles))}`));
+		lines.push(row(`${hint("Total symbols:")} ${accent(formatNumber(stats.totalSymbols))}`));
+		if (stats.totalTokens !== undefined) {
+			lines.push(row(`${hint("Total tokens:")} ${accent(formatNumber(stats.totalTokens))}`));
+		}
+		if (stats.codebaseTokens !== undefined) {
+			lines.push(row(`${hint("Codebase tokens:")} ${accent(formatNumber(stats.codebaseTokens))}`));
+		}
+
+		const renderList = (label: string, entries: Record<string, number>) => {
+			lines.push(emptyRow());
+			lines.push(border("├" + "─".repeat(innerW) + "┤"));
+			lines.push(row(bold(label)));
+
+			const sorted = Object.entries(entries).sort((a, b) => b[1] - a[1]);
+			if (sorted.length === 0) {
+				lines.push(row(muted("(none)")));
+				return;
+			}
+
+			const maxItems = 8;
+			const display = sorted.slice(0, maxItems);
+			const maxLabelLength = Math.min(
+				Math.max(...display.map(([name]) => name.length), 0) + 1,
+				Math.max(4, innerW - 12)
+			);
+
+			for (const [name, value] of display) {
+				const labelText = `${name}:`.padEnd(maxLabelLength);
+				lines.push(row(`${hint(labelText)} ${accent(formatNumber(value))}`));
+			}
+
+			if (sorted.length > maxItems) {
+				lines.push(row(muted(`… ${sorted.length - maxItems} more`)));
+			}
+		};
+
+		renderList("Languages", stats.byLanguage);
+		renderList("Symbols", stats.bySymbolKind);
+
+		lines.push(emptyRow());
+		lines.push(border("├" + "─".repeat(innerW) + "┤"));
+		lines.push(centerRow(closeHint));
+
+		lines.push(border(`╰${"─".repeat(innerW)}╯`));
+
+		return lines;
+	}
+
+	invalidate(): void {}
+
+	dispose(): void {}
 }
 
 /**
@@ -1178,7 +1466,7 @@ export default function codemapExtension(pi: ExtensionAPI): void {
 
 			while (showFileBrowser) {
 				// Show the file browser overlay
-				await ctx.ui.custom<"confirm" | "cancel">(
+				const result = await ctx.ui.custom<FileBrowserAction>(
 					(_tui, _theme, _keybindings, done) => new FileBrowserComponent(
 						state.selectedPaths,
 						state.tokenBudget,
@@ -1218,6 +1506,15 @@ export default function codemapExtension(pi: ExtensionAPI): void {
 					),
 					{ overlay: true }
 				);
+
+				if (result.action === "stats") {
+					await ctx.ui.custom<"close">(
+						(_tui, _theme, _keybindings, done) => new StatsDialog(result.result, result.scopeLabel, done),
+						{ overlay: true }
+					);
+					showFileBrowser = true;
+					continue;
+				}
 
 				// "confirm" or "cancel"
 				if (state.selectedPaths.length > 0) {

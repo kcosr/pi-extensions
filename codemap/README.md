@@ -55,7 +55,7 @@ Directories are expanded to `dir/**`, and glob arguments are single-quoted to pr
 |-----|--------|
 | `↑` / `↓` | Navigate options |
 | `Space` | Toggle checkbox on/off |
-| `Enter` | Toggle checkbox, or edit input field |
+| `Enter` | Toggle checkbox, run action, or edit input field |
 | `0-9` | Type directly into input field |
 | `Backspace` | Delete character (when editing) |
 | `Tab` / `Escape` | Return to file browser |
@@ -68,6 +68,8 @@ Directories are expanded to `dir/**`, and glob arguments are single-quoted to pr
 | Token budget | Limit output size with `-b` flag | 15000 |
 | Share with agent | Use `!` (shared) or `!!` (not shared with LLM) | On |
 
+Show dry run stats: Display the codemap stats summary for the current selection.
+
 ## Features
 
 - **Directory navigation**: Browse into subdirectories, go back with Esc or backspace
@@ -78,6 +80,7 @@ Directories are expanded to `dir/**`, and glob arguments are single-quoted to pr
 - **Gitignore support**: Respects .gitignore in git repos (Tab → Options → toggle)
 - **CWD restricted**: Cannot navigate above the working directory
 - **Editor integration**: Populates input with `!codemap ...` or `!!codemap ...`
+- **Stats summary**: Use Tab → Show dry run stats to view codemap stats for the current selection
 
 ## Search Modes
 
