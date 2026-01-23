@@ -1,5 +1,7 @@
 {
   "tokenBudget": 15000,
   "respectGitignore": true,
-  "shareWithAgent": true
+  "shareWithAgent": true,
+  "skipHidden": true,
+  "skipPatterns": ["node_modules"]
 }

@@ -2,15 +2,10 @@
 
 ## [Unreleased]
 
-### Breaking Changes
-
 ### Added
-
-### Changed
-
-### Fixed
-
-### Removed
+- **codemap**: Add configurable `skipHidden` option to show/hide hidden files (default: true)
+- **codemap**: Add configurable `skipPatterns` option to exclude directories/files (default: `["node_modules"]`, supports globs)
+- **codemap**: Add "Skip hidden files" toggle in options panel
 
 ## [0.2.2] - 2026-01-22
 
