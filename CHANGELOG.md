@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.3] - 2026-01-23
 
 ### Added
 - **codemap**: Add configurable `skipHidden` option to show/hide hidden files (default: true)
