@@ -65,10 +65,13 @@ Directories are expanded to `dir/**`, and glob arguments are single-quoted to pr
 | Option | Description | Default |
 |--------|-------------|---------|
 | Respect .gitignore | Filter out files in .gitignore (git repos only) | On |
+| Skip hidden files | Skip files/directories starting with `.` | On |
 | Token budget | Limit output size with `-b` flag | 15000 |
 | Share with agent | Use `!` (shared) or `!!` (not shared with LLM) | On |
 
 Show dry run stats: Display the codemap stats summary for the current selection.
+
+**Note**: Files matching `skipPatterns` in the config (default: `node_modules`) are always skipped regardless of other settings.
 
 ## Features
 
@@ -104,7 +107,9 @@ Create `~/.pi/agent/extensions/codemap/config.json` to set defaults:
 {
   "tokenBudget": 15000,
   "respectGitignore": true,
-  "shareWithAgent": true
+  "shareWithAgent": true,
+  "skipHidden": true,
+  "skipPatterns": ["node_modules"]
 }
 ```
 
@@ -113,6 +118,8 @@ Create `~/.pi/agent/extensions/codemap/config.json` to set defaults:
 | `tokenBudget` | `number \| null` | `15000` | Default token budget (null = disabled) |
 | `respectGitignore` | `boolean` | `true` | Whether to respect .gitignore by default |
 | `shareWithAgent` | `boolean` | `true` | Whether to share output with agent (`!` vs `!!`) |
+| `skipHidden` | `boolean` | `true` | Whether to skip hidden files (starting with `.`) |
+| `skipPatterns` | `string[]` | `["node_modules"]` | Additional patterns to always skip (supports globs) |
 
 ## Theming
 

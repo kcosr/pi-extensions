@@ -29,12 +29,15 @@ interface CodemapState {
 	tokenBudget: number | null; // null means no budget
 	respectGitignore: boolean;
 	shareWithAgent: boolean; // true = !, false = !!
+	skipHidden: boolean;
 }
 
 interface CodemapConfig {
 	tokenBudget?: number | null;
 	respectGitignore?: boolean;
 	shareWithAgent?: boolean;
+	skipHidden?: boolean;
+	skipPatterns?: string[];
 }
 
 interface CodemapStatsPayload {
@@ -71,6 +74,8 @@ const DEFAULT_CONFIG: CodemapConfig = {
 	tokenBudget: 15000,
 	respectGitignore: true,
 	shareWithAgent: true,
+	skipHidden: true,
+	skipPatterns: ["node_modules"],
 };
 
 /**
@@ -93,12 +98,16 @@ function loadConfig(): CodemapConfig {
 // Load config once at startup
 const config = loadConfig();
 
+// Skip patterns from config
+const skipPatterns = config.skipPatterns ?? ["node_modules"];
+
 // Shared state across the extension
 const state: CodemapState = {
 	selectedPaths: [],
 	tokenBudget: config.tokenBudget ?? 15000,
 	respectGitignore: config.respectGitignore ?? true,
 	shareWithAgent: config.shareWithAgent ?? true,
+	skipHidden: config.skipHidden ?? true,
 };
 
 /**
@@ -298,16 +307,18 @@ function isWithinCwd(targetPath: string, cwdRoot: string): boolean {
 /**
  * List files and directories in a given directory
  */
-function listDirectory(dirPath: string, cwdRoot: string): FileEntry[] {
+function listDirectory(dirPath: string, cwdRoot: string, skipHidden = true): FileEntry[] {
 	const entries: FileEntry[] = [];
 
 	try {
 		const items = fs.readdirSync(dirPath, { withFileTypes: true });
 
 		for (const item of items) {
-			// Skip hidden files and common non-useful directories
-			if (item.name.startsWith(".")) continue;
-			if (item.name === "node_modules") continue;
+			// Skip hidden files if configured
+			if (skipHidden && item.name.startsWith(".")) continue;
+			
+			// Skip patterns from config
+			if (shouldSkipPattern(item.name)) continue;
 
 			const fullPath = path.join(dirPath, item.name);
 			const relativePath = path.relative(cwdRoot, fullPath);
@@ -345,14 +356,16 @@ function listDirectory(dirPath: string, cwdRoot: string): FileEntry[] {
 /**
  * Recursively list all files and directories from a root directory
  */
-function listAllFiles(dirPath: string, cwdRoot: string, results: FileEntry[] = []): FileEntry[] {
+function listAllFiles(dirPath: string, cwdRoot: string, results: FileEntry[] = [], skipHidden = true): FileEntry[] {
 	try {
 		const items = fs.readdirSync(dirPath, { withFileTypes: true });
 
 		for (const item of items) {
-			// Skip hidden files and common non-useful directories
-			if (item.name.startsWith(".")) continue;
-			if (item.name === "node_modules") continue;
+			// Skip hidden files if configured
+			if (skipHidden && item.name.startsWith(".")) continue;
+			
+			// Skip patterns from config
+			if (shouldSkipPattern(item.name)) continue;
 
 			const fullPath = path.join(dirPath, item.name);
 			const relativePath = path.relative(cwdRoot, fullPath);
@@ -375,7 +388,7 @@ function listAllFiles(dirPath: string, cwdRoot: string, results: FileEntry[] = [
 
 			// Recurse into directories
 			if (isDirectory) {
-				listAllFiles(fullPath, cwdRoot, results);
+				listAllFiles(fullPath, cwdRoot, results, skipHidden);
 			}
 		}
 	} catch {
@@ -465,7 +478,7 @@ function listGitFiles(cwdRoot: string): FileEntry[] {
 /**
  * List files in a directory, optionally filtering by git
  */
-function listDirectoryWithGit(dirPath: string, cwdRoot: string, gitFiles: Set<string> | null): FileEntry[] {
+function listDirectoryWithGit(dirPath: string, cwdRoot: string, gitFiles: Set<string> | null, skipHidden = true): FileEntry[] {
 	const entries: FileEntry[] = [];
 
 	try {
@@ -473,9 +486,11 @@ function listDirectoryWithGit(dirPath: string, cwdRoot: string, gitFiles: Set<st
 		const relDir = path.relative(cwdRoot, dirPath);
 
 		for (const item of items) {
-			// Skip hidden files and common non-useful directories
-			if (item.name.startsWith(".")) continue;
-			if (item.name === "node_modules") continue;
+			// Skip hidden files if configured
+			if (skipHidden && item.name.startsWith(".")) continue;
+			
+			// Skip patterns from config
+			if (shouldSkipPattern(item.name)) continue;
 
 			const fullPath = path.join(dirPath, item.name);
 			const relativePath = relDir ? path.join(relDir, item.name) : item.name;
@@ -584,6 +599,21 @@ function globToRegex(pattern: string): RegExp {
 	}
 	
 	return new RegExp("^" + regex + "$", "i");
+}
+
+/**
+ * Check if a name should be skipped based on config patterns
+ */
+function shouldSkipPattern(name: string): boolean {
+	return skipPatterns.some(pattern => {
+		// Support simple wildcards
+		if (pattern.includes("*")) {
+			const regex = globToRegex(pattern);
+			return regex.test(name);
+		}
+		// Exact match
+		return name === pattern;
+	});
 }
 
 /**
@@ -699,6 +729,7 @@ class FileBrowserComponent {
 		initialTokenBudget: number | null,
 		initialRespectGitignore: boolean,
 		initialShareWithAgent: boolean,
+		initialSkipHidden: boolean,
 		onToggle: (relativePath: string, selected: boolean) => void,
 		onOptionChange: (optionId: string, enabled: boolean, value?: string) => void,
 		done: (action: FileBrowserAction) => void
@@ -721,6 +752,12 @@ class FileBrowserComponent {
 				label: "Respect .gitignore",
 				enabled: initialRespectGitignore,
 				visible: () => this.inGitRepo,
+			},
+			{
+				id: "skipHidden",
+				label: "Skip hidden files",
+				enabled: initialSkipHidden,
+				visible: () => true,
 			},
 			{
 				id: "tokenBudget",
@@ -761,6 +798,8 @@ class FileBrowserComponent {
 	rebuildFileLists(): void {
 		const gitignoreOption = this.getOption("gitignore");
 		const respectGitignore = gitignoreOption?.enabled ?? false;
+		const skipHiddenOption = this.getOption("skipHidden");
+		const skipHidden = skipHiddenOption?.enabled ?? true;
 		
 		// Build git file set if in repo and gitignore is enabled
 		if (this.inGitRepo && respectGitignore) {
@@ -769,7 +808,7 @@ class FileBrowserComponent {
 			this.allFilesRecursive = gitEntries;
 		} else {
 			this.gitFiles = null;
-			this.allFilesRecursive = listAllFiles(this.cwdRoot, this.cwdRoot);
+			this.allFilesRecursive = listAllFiles(this.cwdRoot, this.cwdRoot, [], skipHidden);
 		}
 		
 		// Rebuild current directory listing
@@ -786,7 +825,9 @@ class FileBrowserComponent {
 			}];
 		}
 		
-		const entries = listDirectoryWithGit(this.currentDir, this.cwdRoot, this.gitFiles);
+		const skipHiddenOption = this.getOption("skipHidden");
+		const skipHidden = skipHiddenOption?.enabled ?? true;
+		const entries = listDirectoryWithGit(this.currentDir, this.cwdRoot, this.gitFiles, skipHidden);
 		
 		// Add ".." entry at top (shows parent view at root)
 		entries.unshift({
@@ -931,7 +972,7 @@ class FileBrowserComponent {
 			// Space toggles the checkbox
 			if (currentOption && currentOption.kind !== "action") {
 				currentOption.enabled = !currentOption.enabled;
-				if (currentOption.id === "gitignore") {
+				if (currentOption.id === "gitignore" || currentOption.id === "skipHidden") {
 					this.rebuildFileLists();
 				}
 				this.notifyOptionChange(currentOption);
@@ -964,7 +1005,7 @@ class FileBrowserComponent {
 				this.editingInput = true;
 			} else if (currentOption) {
 				currentOption.enabled = !currentOption.enabled;
-				if (currentOption.id === "gitignore") {
+				if (currentOption.id === "gitignore" || currentOption.id === "skipHidden") {
 					this.rebuildFileLists();
 				}
 				this.notifyOptionChange(currentOption);
@@ -1472,6 +1513,7 @@ export default function codemapExtension(pi: ExtensionAPI): void {
 						state.tokenBudget,
 						state.respectGitignore,
 						state.shareWithAgent,
+						state.skipHidden,
 						(relativePath, selected) => {
 							if (selected) {
 								if (!state.selectedPaths.includes(relativePath)) {
@@ -1500,6 +1542,8 @@ export default function codemapExtension(pi: ExtensionAPI): void {
 								state.respectGitignore = enabled;
 							} else if (optionId === "shareWithAgent") {
 								state.shareWithAgent = enabled;
+							} else if (optionId === "skipHidden") {
+								state.skipHidden = enabled;
 							}
 						},
 						(action) => done(action)
