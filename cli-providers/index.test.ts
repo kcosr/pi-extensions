@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import type { Message, Model } from "@mariozechner/pi-ai";
 import {
 	buildCliArgs,
+	buildCliToolDisplay,
 	extractPromptText,
 	resolveLogFilePath,
 	truncateLines,
@@ -114,5 +115,29 @@ describe("cli-providers helpers", () => {
 
 		assert.deepEqual(sent, ["Bash:call", "Bash:result"]);
 		assert.equal(queue.length, 0);
+	});
+
+	it("buildCliToolDisplay formats args and output", () => {
+		const callDisplay = buildCliToolDisplay({
+			phase: "call",
+			toolName: "Bash",
+			toolCallId: "tool-1",
+			args: { command: "ls" },
+		});
+
+		const resultDisplay = buildCliToolDisplay({
+			phase: "result",
+			toolName: "Bash",
+			toolCallId: "tool-1",
+			result: "ok\nline2",
+			isError: false,
+		});
+
+		assert.equal(callDisplay.title, "Bash");
+		assert.equal(callDisplay.status, "call");
+		assert.equal(callDisplay.toolCallId, "tool-1");
+		assert.ok(callDisplay.argsText?.includes('"command"'));
+		assert.equal(resultDisplay.status, "done");
+		assert.equal(resultDisplay.outputText, "ok\nline2");
 	});
 });

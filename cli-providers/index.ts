@@ -16,7 +16,7 @@ import {
 	type Model,
 	type SimpleStreamOptions,
 } from "@mariozechner/pi-ai";
-import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+import { Box, Spacer, Text } from "@mariozechner/pi-tui";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import * as fs from "node:fs";
@@ -84,6 +84,17 @@ interface CliLogWriter {
 	close: () => void;
 }
 
+export interface CliToolDisplay {
+	title: string;
+	status: "call" | "done" | "error";
+	phase: "call" | "result";
+	toolCallId?: string;
+	argsText?: string;
+	argsTruncated?: boolean;
+	outputText?: string;
+	outputTruncated?: boolean;
+}
+
 const CONFIG_PATH = path.join(os.homedir(), ".pi", "agent", "extensions", "cli-providers", "config.json");
 const DEFAULT_CONFIG: CliProvidersConfig = { providers: [] };
 const DEFAULT_BASE_URL = "cli://local";
@@ -96,6 +107,7 @@ const DEFAULT_OUTPUT_FORMAT: CliInvocationConfig["outputFormat"] = "jsonl";
 const STDERR_LIMIT = 20_000;
 const KILL_TIMEOUT_MS = 2_000;
 const TOOL_OUTPUT_LINES = 12;
+const TOOL_ARGS_LINES = 8;
 
 let extensionApi: ExtensionAPI | null = null;
 const seenSessionIds = new Set<string>();
@@ -317,6 +329,36 @@ function formatInlineJson(value: unknown, maxLength: number): string | undefined
 	} catch {
 		return undefined;
 	}
+}
+
+function formatJsonBlock(value: unknown, maxLines: number): { text: string; truncated: boolean } | undefined {
+	if (value === undefined) return undefined;
+	try {
+		const text = JSON.stringify(value, null, 2);
+		if (!text) return undefined;
+		return truncateLines(text, maxLines);
+	} catch {
+		return undefined;
+	}
+}
+
+export function buildCliToolDisplay(message: CliToolMessage): CliToolDisplay {
+	const status = message.phase === "call" ? "call" : message.isError ? "error" : "done";
+	const argsInfo =
+		message.phase === "call" && message.args !== undefined ? formatJsonBlock(message.args, TOOL_ARGS_LINES) : undefined;
+	const fallbackOutput = message.outputSnippet ? undefined : extractToolOutput(message.result);
+	const outputInfo = fallbackOutput ? truncateLines(fallbackOutput, TOOL_OUTPUT_LINES) : undefined;
+
+	return {
+		title: message.toolName,
+		status,
+		phase: message.phase,
+		toolCallId: message.toolCallId,
+		argsText: argsInfo?.text,
+		argsTruncated: argsInfo?.truncated,
+		outputText: message.outputSnippet ?? outputInfo?.text,
+		outputTruncated: message.outputTruncated ?? outputInfo?.truncated,
+	};
 }
 
 function createCliLogWriter(
@@ -883,12 +925,56 @@ export default function cliProvidersExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.registerMessageRenderer("cli-tool", (message, _options, theme) => {
-		const container = new Container();
-		container.addChild(new Spacer(1));
-		const header = theme.fg("toolTitle", "CLI Tool");
+		const details = message.details as CliToolMessage | undefined;
+		const display = details ? buildCliToolDisplay(details) : undefined;
+		const titleText = display?.title ?? "CLI Tool";
+		const status = display?.status;
+		const statusColor = status === "error" ? "error" : status === "call" ? "warning" : "success";
+
+		const bgFn =
+			status === "error"
+				? (text: string) => theme.bg("toolErrorBg", text)
+				: status === "call"
+				? (text: string) => theme.bg("toolPendingBg", text)
+				: status === "done"
+				? (text: string) => theme.bg("toolSuccessBg", text)
+				: (text: string) => theme.bg("customMessageBg", text);
+		const container = new Box(1, 1, bgFn);
+
+		let header = theme.fg("toolTitle", theme.bold(titleText));
+		if (status) {
+			header += " " + theme.fg(statusColor, status);
+		}
 		container.addChild(new Text(header, 0, 0));
-		container.addChild(new Spacer(1));
-		container.addChild(new Markdown(message.content, 0, 0));
+
+		if (display?.toolCallId) {
+			container.addChild(new Text(theme.fg("muted", `id: ${display.toolCallId}`), 0, 0));
+		}
+
+		if (display?.argsText) {
+			container.addChild(new Spacer(1));
+			container.addChild(new Text(theme.fg("muted", "args:"), 0, 0));
+			container.addChild(new Text(theme.fg("toolOutput", display.argsText), 0, 0));
+			if (display.argsTruncated) {
+				container.addChild(new Text(theme.fg("muted", "[args truncated]"), 0, 0));
+			}
+		}
+
+		if (display?.outputText) {
+			container.addChild(new Spacer(1));
+			container.addChild(new Text(theme.fg("muted", "output:"), 0, 0));
+			const outputColor = display.status === "error" ? "error" : "toolOutput";
+			container.addChild(new Text(theme.fg(outputColor, display.outputText), 0, 0));
+			if (display.outputTruncated) {
+				container.addChild(new Text(theme.fg("muted", "[output truncated]"), 0, 0));
+			}
+		} else if (display?.phase === "result") {
+			container.addChild(new Spacer(1));
+			container.addChild(new Text(theme.fg("muted", "output: (none)"), 0, 0));
+		} else {
+			container.addChild(new Spacer(1));
+			container.addChild(new Text(theme.fg("muted", message.content), 0, 0));
+		}
 		return container;
 	});
 

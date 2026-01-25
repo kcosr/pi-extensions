@@ -6,11 +6,15 @@
 - **cli-providers**: Register external CLI tools as pi models via a new extension (JSONL streaming + custom tool messages)
 - **cli-providers**: Add `logFile` to capture raw CLI output for debugging
 
+### Changed
+- **cli-providers**: Improve CLI tool message rendering with styled headers and args/output sections
+
 ### Fixed
 - **cli-providers**: Treat non-JSON output in `jsonl` mode as an error to avoid echoing tool output into responses
 - **cli-providers**: Disable Claude CLI thinking flag in example config to match `claude --help`
 - **cli-providers**: Ignore `tool_use` stop reasons so pi doesn't re-run tools that the CLI already executed
 - **cli-providers**: Defer CLI tool messages until after streaming completes to avoid steering loops
+- **cli-providers**: Fix custom tool box background rendering in the CLI tool message renderer
 
 ## [0.2.3] - 2026-01-23
 
