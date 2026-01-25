@@ -1,0 +1,18 @@
+{
+  "name": "cli-providers",
+  "version": "0.2.3",
+  "description": "External CLI providers for pi",
+  "main": "index.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kcosr/pi-extensions"
+  },
+  "author": "kcosr",
+  "license": "MIT",
+  "scripts": {
+    "test": "tsx --test"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0"
+  }
+}

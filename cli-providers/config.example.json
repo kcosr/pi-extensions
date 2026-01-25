@@ -1,0 +1,54 @@
+{
+  "providers": [
+    {
+      "name": "cli",
+      "api": "external-cli",
+      "baseUrl": "cli://local",
+      "apiKey": "CLI_NO_KEY",
+      "models": [
+        {
+          "id": "claude-cli/sonnet",
+          "name": "Claude CLI (Sonnet)",
+          "reasoning": true,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000,
+          "maxTokens": 8192,
+          "cli": {
+            "executable": "claude",
+            "args": [
+              "--print",
+              "--verbose",
+              "--output-format",
+              "stream-json",
+              "--include-partial-messages"
+            ],
+            "modelArg": "sonnet",
+            "thinkingFlag": "",
+            "sessionFlag": "--session-id",
+            "resumeFlag": "--resume",
+            "promptFlag": "",
+            "outputFormat": "jsonl",
+            "logFile": "~/.pi/agent/extensions/cli-providers/claude-cli.log"
+          }
+        },
+        {
+          "id": "codex-cli",
+          "name": "OpenAI Codex CLI",
+          "reasoning": true,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000,
+          "maxTokens": 8192,
+          "cli": {
+            "executable": "codex",
+            "args": ["--json"],
+            "modelArg": "codex",
+            "promptFlag": "-p",
+            "outputFormat": "jsonl"
+          }
+        }
+      ]
+    }
+  ]
+}

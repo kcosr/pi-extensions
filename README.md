@@ -43,6 +43,7 @@ Reload pi after installing.
 
 | Extension | Description |
 |-----------|-------------|
+| [cli-providers](cli-providers/) | Register external CLI tools (Claude CLI, Codex CLI, etc.) as pi models. |
 | [codemap](codemap/) | File browser for selecting files/directories to pass to `codemap` via `/codemap`. |
 | [skill-picker](skill-picker/) | Command palette for selecting and queueing skills explicitly via `/skill` command. Hard fork of [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette). |
 | [toolwatch](toolwatch/) | Tool call auditing and approval system. Log all tool calls to SQLite, block dangerous commands, require manual approval for sensitive operations. |
