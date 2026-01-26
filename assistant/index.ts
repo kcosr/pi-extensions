@@ -18,6 +18,7 @@ import {
   buildNoteMetadataBlock,
 } from "./format";
 import { buildInstancePlan } from "./instances";
+import { buildListItemEntries, normalizeWhitespace } from "./entries";
 
 type IncludeMode = "metadata" | "content";
 type PickerMode = "lists" | "notes";
@@ -111,6 +112,12 @@ interface PickerEntry {
   listId?: string;
   item?: ListItem;
   note?: NoteSummary;
+}
+
+interface MenuEntry {
+  id: string;
+  label: string;
+  description?: string;
 }
 
 interface PickerResult {
@@ -320,10 +327,6 @@ function parseNoteContent(raw: unknown): NoteContent | null {
   };
 }
 
-function normalizeWhitespace(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
-}
-
 function listSelectionKey(instanceId: string, listId: string, itemId: string): string {
   return `list:${instanceId}:${listId}:${itemId}`;
 }
@@ -461,6 +464,10 @@ class AssistantPickerComponent {
   private instanceIds: string[];
   private instanceIndex = 0;
   private listIndex = 0;
+  private menuMode: "list" | "instance" | null = null;
+  private menuQuery = "";
+  private menuFiltered: MenuEntry[] = [];
+  private menuSelectedIndex = 0;
 
   constructor(
     private instances: Map<string, InstanceData>,
@@ -469,7 +476,7 @@ class AssistantPickerComponent {
     private listInstanceIds: Set<string>,
     private noteInstanceIds: Set<string>,
     private done: (result: PickerResult) => void,
-    private onSelectionChange: () => void
+  private onSelectionChange: () => void
   ) {
     this.instanceIds = Array.from(instances.keys());
     if (this.instanceIds.length === 0) {
@@ -491,6 +498,11 @@ class AssistantPickerComponent {
   }
 
   handleInput(data: string): void {
+    if (this.menuMode) {
+      this.handleMenuInput(data);
+      return;
+    }
+
     if (matchesKey(data, "tab")) {
       if (this.getOptions().length > 0) {
         this.focusOnOptions = !this.focusOnOptions;
@@ -512,8 +524,20 @@ class AssistantPickerComponent {
     }
 
     if (matchesKey(data, "return")) {
-      this.done({ action: "confirm" });
-      return;
+      if (this.focusOnOptions) {
+        const option = this.getOptions()[this.selectedOption];
+        if (option?.id === "list") {
+          this.openMenu("list");
+          return;
+        }
+        if (option?.id === "instance") {
+          this.openMenu("instance");
+          return;
+        }
+      } else {
+        this.done({ action: "confirm" });
+        return;
+      }
     }
 
     if (data === " ") {
@@ -581,6 +605,117 @@ class AssistantPickerComponent {
         this.cycleOption(option, direction);
       }
     }
+  }
+
+  private handleMenuInput(data: string): void {
+    if (!this.menuMode) return;
+
+    if (matchesKey(data, "escape")) {
+      this.closeMenu();
+      return;
+    }
+
+    if (matchesKey(data, "return")) {
+      const entry = this.menuFiltered[this.menuSelectedIndex];
+      if (entry) {
+        if (this.menuMode === "instance") {
+          this.state.instanceId = entry.id;
+          this.ensureInstanceForMode();
+          const activeLists = this.getActiveLists();
+          if (activeLists.length > 0) {
+            this.listIndex = 0;
+            this.state.selectedListId = activeLists[0]?.id;
+          } else {
+            this.state.selectedListId = undefined;
+          }
+        } else if (this.menuMode === "list") {
+          this.state.selectedListId = entry.id;
+          const lists = this.getActiveLists();
+          const index = lists.findIndex((list) => list.id === entry.id);
+          this.listIndex = index >= 0 ? index : 0;
+        }
+        this.updateFilter();
+      }
+      this.closeMenu();
+      return;
+    }
+
+    if (matchesKey(data, "up")) {
+      if (this.menuFiltered.length > 0) {
+        this.menuSelectedIndex =
+          this.menuSelectedIndex === 0 ? this.menuFiltered.length - 1 : this.menuSelectedIndex - 1;
+      }
+      return;
+    }
+
+    if (matchesKey(data, "down")) {
+      if (this.menuFiltered.length > 0) {
+        this.menuSelectedIndex =
+          this.menuSelectedIndex === this.menuFiltered.length - 1 ? 0 : this.menuSelectedIndex + 1;
+      }
+      return;
+    }
+
+    if (matchesKey(data, "backspace")) {
+      if (this.menuQuery.length > 0) {
+        this.menuQuery = this.menuQuery.slice(0, -1);
+        this.updateMenuFilter();
+      }
+      return;
+    }
+
+    if (data.length === 1 && data.charCodeAt(0) >= 32) {
+      this.menuQuery += data;
+      this.updateMenuFilter();
+    }
+  }
+
+  private openMenu(mode: "list" | "instance"): void {
+    this.menuMode = mode;
+    this.menuQuery = "";
+    this.menuSelectedIndex = 0;
+    this.updateMenuFilter();
+  }
+
+  private closeMenu(): void {
+    this.menuMode = null;
+    this.menuQuery = "";
+    this.menuSelectedIndex = 0;
+    this.menuFiltered = [];
+  }
+
+  private getMenuEntries(): MenuEntry[] {
+    if (this.menuMode === "instance") {
+      return this.getInstanceChoices().map((id) => ({ id, label: id }));
+    }
+
+    if (this.menuMode === "list") {
+      return this.getActiveLists().map((list) => ({
+        id: list.id,
+        label: list.name || list.id,
+      }));
+    }
+
+    return [];
+  }
+
+  private updateMenuFilter(): void {
+    const entries = this.getMenuEntries();
+    if (!this.menuQuery.trim()) {
+      this.menuFiltered = entries;
+      this.menuSelectedIndex = 0;
+      return;
+    }
+    const scored = entries
+      .map((entry) => ({
+        entry,
+        score: fuzzyScore(this.menuQuery, entry.label),
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.entry);
+    this.menuFiltered = scored;
+    this.menuSelectedIndex = 0;
   }
 
   private cycleOption(option: PickerOption, direction: number): void {
@@ -710,21 +845,25 @@ class AssistantPickerComponent {
     }
 
     const list = this.getActiveList();
-    if (!list) return [];
-    const items = this.getActiveData().listItemsByListId.get(list.id) ?? [];
-    return items.map((item) => {
-      const description = this.showListNotesPreview && item.notes
-        ? normalizeWhitespace(item.notes)
-        : undefined;
-      const itemId = item.id ?? "";
-      const key = itemId ? listSelectionKey(this.getActiveInstanceId(), list.id, itemId) : `list:${list.id}:${item.title}`;
+    const listEntries = buildListItemEntries(
+      this.getActiveLists(),
+      this.getActiveData().listItemsByListId,
+      list?.id,
+      this.query,
+      this.showListNotesPreview
+    );
+    return listEntries.map((entry) => {
+      const itemId = entry.item.id ?? "";
+      const key = itemId
+        ? listSelectionKey(this.getActiveInstanceId(), entry.listId, itemId)
+        : `list:${entry.listId}:${entry.item.title}`;
       return {
         key,
         kind: "list",
-        title: item.title,
-        ...(description ? { description } : {}),
-        listId: list.id,
-        item,
+        title: entry.item.title,
+        ...(entry.description ? { description: entry.description } : {}),
+        listId: entry.listId,
+        item: entry.item,
       };
     });
   }
@@ -844,8 +983,11 @@ class AssistantPickerComponent {
     const rightBorder = borderLen - leftBorder;
     lines.push(border("+" + "-".repeat(leftBorder)) + title(titleText) + border("-".repeat(rightBorder) + "+"));
 
-    const queryDisplay = this.query || placeholder("type to filter...");
-    lines.push(row(`Search: ${queryDisplay}`));
+    const isMenu = this.menuMode !== null;
+    const queryDisplay = isMenu
+      ? this.menuQuery || placeholder(`type to ${this.menuMode === "list" ? "filter lists" : "filter instances"}...`)
+      : this.query || placeholder("type to filter...");
+    lines.push(row(`${isMenu ? (this.menuMode === "list" ? "Filter lists" : "Filter instances") : "Search"}: ${queryDisplay}`));
 
     lines.push(border("+" + "-".repeat(innerW) + "+"));
 
@@ -854,20 +996,37 @@ class AssistantPickerComponent {
     const contextLine = `Mode: ${modeLabel} | List: ${listLabel} | Instance: ${this.getActiveInstanceId()}`;
     lines.push(row(truncate(contextLine, innerW - 1)));
 
-    const entries = this.filtered;
+    const entries = this.menuMode ? this.menuFiltered : this.filtered;
+    const cursorIndex = this.menuMode ? this.menuSelectedIndex : this.selectedIndex;
     const maxVisible = 8;
     const startIndex = Math.max(
       0,
-      Math.min(this.selectedIndex - Math.floor(maxVisible / 2), entries.length - maxVisible)
+      Math.min(cursorIndex - Math.floor(maxVisible / 2), entries.length - maxVisible)
     );
     const endIndex = Math.min(startIndex + maxVisible, entries.length);
 
     if (entries.length === 0) {
-      const emptyLabel = this.state.mode === "lists" ? "No list items" : "No notes";
+      const emptyLabel = this.menuMode
+        ? `No ${this.menuMode === "list" ? "lists" : "instances"}`
+        : this.state.mode === "lists"
+          ? "No list items"
+          : "No notes";
       lines.push(row(hint(emptyLabel)));
-    } else {
+    } else if (this.menuMode) {
       for (let i = startIndex; i < endIndex; i++) {
         const entry = entries[i];
+        const isCursor = i === this.menuSelectedIndex;
+        const cursor = isCursor ? ">" : " ";
+        const label = "label" in entry ? entry.label : entry.title;
+        const desc = "description" in entry && entry.description ? ` - ${entry.description}` : "";
+        const rawLine = `${cursor} ${label}${desc}`;
+        const truncated = truncate(rawLine, innerW - 1);
+        const rendered = isCursor ? selected(truncated) : truncated;
+        lines.push(row(rendered));
+      }
+    } else {
+      for (let i = startIndex; i < endIndex; i++) {
+        const entry = entries[i] as PickerEntry;
         const isCursor = i === this.selectedIndex;
         const isSelected = this.state.selections.has(entry.key);
         const marker = isSelected ? "[x]" : "[ ]";
@@ -897,7 +1056,9 @@ class AssistantPickerComponent {
     }
 
     lines.push(border("+" + "-".repeat(innerW) + "+"));
-    const hintLine = "Enter confirm  Space toggle  Tab options  Esc close";
+    const hintLine = this.menuMode
+      ? "Enter select  Esc back"
+      : "Enter confirm  Space toggle  Tab options  Esc close";
     lines.push(row(hint(truncate(hintLine, innerW - 1))));
     lines.push(border("+" + "-".repeat(innerW) + "+"));
 

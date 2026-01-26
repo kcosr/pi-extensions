@@ -49,7 +49,9 @@ instance from config and allow a quick selector in the UI when multiple instance
   - Enter: confirm and queue
   - Tab: cycle focus between search input, list, and options row
   - Esc: cancel
-- Fuzzy search input at the top (reuse `matchesKey` from skill-picker).
+- Fuzzy search input at the top (reuse `matchesKey` from skill-picker). In Lists mode,
+  empty search shows the selected list, while a non-empty query searches across all lists
+  (list names included in matches).
 - Footer shows count + selection summary; use `ctx.ui.setStatus()` + `ctx.ui.setWidget()`.
 
 #### Lists mode

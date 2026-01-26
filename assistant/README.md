@@ -28,6 +28,10 @@ Selected items are injected into your next message.
 
 If a selected instance is only available for lists or notes, the other section will appear empty.
 
+In Lists mode, an empty search shows items from the selected list. Typing a query searches across
+all lists in the current instance (list names are included in matches). Use the List menu to
+drill into a specific list.
+
 ## Keyboard Shortcuts
 
 | Key | Action |
@@ -37,6 +41,9 @@ If a selected instance is only available for lists or notes, the other section w
 | `Enter` | Confirm and close |
 | `Tab` | Toggle options focus |
 | `Esc` | Close |
+
+### Options Menu
+When focus is on the options row, press `Enter` on **List** or **Instance** to open a picker.
 
 ## Output Modes
 
