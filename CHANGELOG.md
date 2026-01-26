@@ -8,6 +8,8 @@
 ### Changed
 - **assistant**: Add list/instance/include pickers, scoped search with all-list/instance modes, and persisted picker state
 - **assistant**: Insert selections into the editor on confirm (codemap-style Enter behavior)
+- **assistant**: Include list item custom fields in injected metadata/content blocks
+- **assistant**: Format list item notes with User/Agent headings and expand custom fields into frontmatter keys
 
 ## [0.2.3] - 2026-01-23
 
