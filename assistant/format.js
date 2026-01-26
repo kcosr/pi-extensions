@@ -140,9 +140,15 @@ function buildNoteContentBlock(note, instanceId, content) {
   return `${frontmatter}\n\n${content}`;
 }
 
+function joinBlocks(blocks) {
+  if (!Array.isArray(blocks)) return "";
+  return blocks.filter((block) => typeof block === "string" && block.length > 0).join("\n\n");
+}
+
 module.exports = {
   buildListItemExportBlock,
   buildListItemContentBlock,
   buildNoteMetadataBlock,
   buildNoteContentBlock,
+  joinBlocks,
 };

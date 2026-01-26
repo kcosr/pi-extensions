@@ -16,6 +16,7 @@ import {
   buildListItemExportBlock,
   buildNoteContentBlock,
   buildNoteMetadataBlock,
+  joinBlocks,
 } from "./format";
 import { buildInstancePlan } from "./instances";
 import { buildListItemEntries, normalizeWhitespace } from "./entries";
@@ -571,20 +572,12 @@ class AssistantPickerComponent {
     }
 
     if (matchesKey(data, "return")) {
-      if (this.focusOnOptions) {
-        const option = this.getOptions()[this.selectedOption];
-        if (option?.id === "list") {
-          this.openMenu("list");
-          return;
-        }
-        if (option?.id === "instance") {
-          this.openMenu("instance");
-          return;
-        }
-      } else {
-        this.done({ action: "confirm" });
-        return;
+      const entry = this.filtered[this.selectedIndex];
+      if (entry && !this.state.selections.has(entry.key)) {
+        this.toggleSelection(entry);
       }
+      this.done({ action: "confirm" });
+      return;
     }
 
     if (data === " ") {
@@ -1302,7 +1295,7 @@ class AssistantPickerComponent {
     lines.push(border("+" + "-".repeat(innerW) + "+"));
     const hintLine = this.menuMode
       ? "Enter select  Esc back"
-      : "Enter confirm  Space toggle  Tab options  Esc close";
+      : "Enter insert  Space toggle  Tab options  Esc close";
     lines.push(row(hint(truncate(hintLine, innerW - 1))));
     lines.push(border("+" + "-".repeat(innerW) + "+"));
 
@@ -1501,7 +1494,7 @@ export default function assistantExtension(pi: ExtensionAPI): void {
 
       ctx.ui.setStatus("assistant", undefined);
 
-      await ctx.ui.custom<PickerResult>(
+      const result = await ctx.ui.custom<PickerResult>(
         (_tui, _theme, _keybindings, done) =>
           new AssistantPickerComponent(
             instances,
@@ -1525,41 +1518,35 @@ export default function assistantExtension(pi: ExtensionAPI): void {
       const summary = formatSelectionSummary(state);
       ctx.ui.setStatus("assistant", summary.status);
       ctx.ui.setWidget("assistant", summary.widget);
-    },
-  });
 
-  pi.on("before_agent_start", async (_event, ctx) => {
-    if (state.selections.size === 0) {
-      return {};
-    }
-
-    const selections: Selection[] = [];
-    for (const key of state.order) {
-      const selection = state.selections.get(key);
-      if (selection) {
-        selections.push(selection);
+      if (result.action !== "confirm" || state.selections.size === 0) {
+        return;
       }
-    }
 
-    state.selections.clear();
-    state.order = [];
+      const selections: Selection[] = [];
+      for (const key of state.order) {
+        const selection = state.selections.get(key);
+        if (selection) {
+          selections.push(selection);
+        }
+      }
 
-    ctx.ui?.setStatus("assistant", undefined);
-    ctx.ui?.setWidget("assistant", undefined);
+      ctx.ui.setStatus("assistant", "Preparing selection...");
+      const blocks = await buildSelectionBlocks(selections, state.includeMode, client, ctx);
+      const content = joinBlocks(blocks);
+      if (!content) {
+        ctx.ui.notify("No content to insert", "warning");
+        ctx.ui.setStatus("assistant", summary.status);
+        ctx.ui.setWidget("assistant", summary.widget);
+        return;
+      }
 
-    const client = resolvedUrl ? new AssistantClient(resolvedUrl) : null;
-    const blocks = await buildSelectionBlocks(selections, state.includeMode, client, ctx);
-
-    if (blocks.length === 0) {
-      return {};
-    }
-
-    return {
-      message: {
-        customType: "assistant",
-        content: blocks.join("\n\n"),
-        display: true,
-      },
-    };
+      ctx.ui.setEditorText(content);
+      ctx.ui.notify("Assistant context ready - press Enter to send", "info");
+      state.selections.clear();
+      state.order = [];
+      ctx.ui.setStatus("assistant", undefined);
+      ctx.ui.setWidget("assistant", undefined);
+    },
   });
 }

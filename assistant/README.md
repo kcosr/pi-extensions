@@ -24,7 +24,7 @@ Open the picker:
 /assistant
 ```
 
-Selected items are injected into your next message.
+Selected items are inserted into the editor; press Enter to send.
 
 If a selected instance is only available for lists or notes, the other section will appear empty.
 
@@ -43,7 +43,7 @@ The picker remembers the last mode, include setting, instance, and list in
 | --- | --- |
 | `Up` / `Down` | Navigate entries |
 | `Space` | Toggle selection |
-| `Enter` | Confirm and close |
+| `Enter` | Insert selection and close (adds current row if not selected) |
 | `Tab` | Toggle options focus |
 | `Esc` | Close |
 

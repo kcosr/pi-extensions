@@ -7,6 +7,7 @@
 
 ### Changed
 - **assistant**: Add list/instance/include pickers, scoped search with all-list/instance modes, and persisted picker state
+- **assistant**: Insert selections into the editor on confirm (codemap-style Enter behavior)
 
 ## [0.2.3] - 2026-01-23
 

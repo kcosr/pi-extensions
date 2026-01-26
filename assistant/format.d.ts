@@ -42,3 +42,5 @@ export function buildNoteContentBlock(
   instanceId: string | null | undefined,
   content: string
 ): string | null;
+
+export function joinBlocks(blocks: Array<string | null | undefined>): string;

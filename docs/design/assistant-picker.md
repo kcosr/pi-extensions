@@ -99,9 +99,9 @@ instance_id: <instance>
 - **Notes**: YAML frontmatter metadata + raw markdown content (same as "Copy Markdown").
 
 ## Injection strategy
-- Mirror skill-picker's `before_agent_start` injection approach.
-- Store selected items in extension state; clear after injection.
-- Emit a custom message block with `customType: "assistant"` and `display: true`.
+- Populate the editor with the selected blocks on confirm (codemap-style).
+- Store selected items in extension state; clear after insertion.
+- Prompt the user to press Enter to send.
 
 ## Configuration
 Config file: `~/.pi/agent/extensions/assistant/config.json`
@@ -144,7 +144,7 @@ Persisted UI state:
 1. Scaffold extension directory + package.json + README.
 2. Implement Assistant API client (lists/notes fetch + list item/note read).
 3. Build picker UI (fuzzy search, multi-select, mode switch, options row).
-4. Track selection + injection via `before_agent_start`.
+4. Track selection + insert into editor on confirm.
 5. Add tests for formatting helpers and selection logic.
 
 ## Decisions

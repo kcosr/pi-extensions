@@ -5,6 +5,7 @@ const {
   buildListItemContentBlock,
   buildNoteMetadataBlock,
   buildNoteContentBlock,
+  joinBlocks,
 } = require("./format");
 
 test("buildListItemExportBlock includes optional fields", () => {
@@ -64,4 +65,9 @@ test("buildNoteContentBlock combines frontmatter and content", () => {
   assert.match(block, /plugin: \"notes\"/);
   assert.match(block, /title: \"Note\"/);
   assert.match(block, /# Heading/);
+});
+
+test("joinBlocks concatenates blocks with spacing", () => {
+  const joined = joinBlocks(["one", null, "", "two"]);
+  assert.equal(joined, "one\n\ntwo");
 });
