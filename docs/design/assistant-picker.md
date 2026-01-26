@@ -9,7 +9,7 @@ List item exports must match the Assistant web UI copy/paste formatting.
 ## Goals
 - Provide a fast, keyboard-first palette to pull Assistant list items and notes into pi.
 - Support multi-select with Space and confirm with Enter, matching skill-picker UX.
-- Offer a mode toggle for metadata vs full content (JSON for lists, raw markdown for notes).
+- Offer a mode toggle for metadata vs full content (frontmatter + notes for lists, raw markdown for notes).
 - Keep list item formatting identical to the Assistant web UI export format.
 
 ## Non-goals
@@ -50,8 +50,10 @@ instance from config and allow a quick selector in the UI when multiple instance
   - Tab: cycle focus between search input, list, and options row
   - Esc: cancel
 - Fuzzy search input at the top (reuse `matchesKey` from skill-picker). In Lists mode,
-  empty search shows the selected list, while a non-empty query searches across all lists
-  (list names included in matches).
+  empty search shows the selected list. If **List = All lists**, a non-empty query searches
+  across all lists (list names included in matches). **Instance = All instances** searches
+  across instances.
+- Options row supports Enter to open pickers for **List**, **Instance**, and **Include**.
 - Footer shows count + selection summary; use `ctx.ui.setStatus()` + `ctx.ui.setWidget()`.
 
 #### Lists mode
@@ -118,6 +120,9 @@ Environment override:
 
 No token support is required; the extension does not send auth headers.
 
+Persisted UI state:
+- `~/.pi/agent/extensions/assistant/state.json` stores last-used mode, include mode, instance, and list.
+
 ## Error handling
 - If Assistant server is unreachable, show `ctx.ui.notify()` and status text.
 - If an item fails to load, skip it and surface a warning in the status widget.
@@ -144,7 +149,7 @@ No token support is required; the extension does not send auth headers.
 
 ## Decisions
 - Command name: `/assistant`.
-- List content mode: full `ListItem` JSON + list metadata.
+- List content mode: YAML frontmatter metadata + notes content (when present).
 - Note content format: metadata block + raw markdown.
 
 ## Open questions

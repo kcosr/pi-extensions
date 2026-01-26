@@ -29,8 +29,13 @@ Selected items are injected into your next message.
 If a selected instance is only available for lists or notes, the other section will appear empty.
 
 In Lists mode, an empty search shows items from the selected list. Typing a query searches across
-all lists in the current instance (list names are included in matches). Use the List menu to
-drill into a specific list.
+all lists in the selected scope when **List = All lists** (list names are included in matches).
+Use the List menu to drill into a specific list.
+
+Set **Instance = All instances** for cross-instance search (type a query to see results).
+
+The picker remembers the last mode, include setting, instance, and list in
+`~/.pi/agent/extensions/assistant/state.json`.
 
 ## Keyboard Shortcuts
 
@@ -43,7 +48,7 @@ drill into a specific list.
 | `Esc` | Close |
 
 ### Options Menu
-When focus is on the options row, press `Enter` on **List** or **Instance** to open a picker.
+When focus is on the options row, press `Enter` on **List**, **Instance**, or **Include** to open a picker.
 
 ## Output Modes
 

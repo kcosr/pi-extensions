@@ -3,8 +3,12 @@ function normalizeWhitespace(value) {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function buildListItemEntries(lists, listItemsByListId, activeListId, query, showNotesPreview) {
-  const trimmedQuery = typeof query === "string" ? query.trim() : "";
+function buildListItemEntries(lists, listItemsByListId, listScopeId, showNotesPreview, options) {
+  const scopeId = typeof listScopeId === "string" && listScopeId.trim().length > 0 ? listScopeId : null;
+  const includeListLabel = options && options.includeListLabel === true;
+  const instanceLabel = options && typeof options.instanceLabel === "string" && options.instanceLabel.trim().length > 0
+    ? options.instanceLabel.trim()
+    : "";
   const listMap = new Map();
   for (const list of lists || []) {
     if (list && list.id) {
@@ -12,34 +16,25 @@ function buildListItemEntries(lists, listItemsByListId, activeListId, query, sho
     }
   }
 
-  if (!trimmedQuery) {
-    const fallbackListId = activeListId || (lists && lists[0] ? lists[0].id : undefined);
-    if (!fallbackListId) return [];
-    const list = listMap.get(fallbackListId);
-    const listName = list && list.name ? list.name : fallbackListId;
-    const items = listItemsByListId.get(fallbackListId) || [];
-    return items.map((item) => {
-      const description = showNotesPreview && item && typeof item.notes === "string" && item.notes.trim()
-        ? normalizeWhitespace(item.notes)
-        : undefined;
-      return {
-        listId: fallbackListId,
-        listName,
-        item,
-        description,
-      };
-    });
-  }
-
   const entries = [];
   for (const list of lists || []) {
     if (!list || !list.id) continue;
+    if (scopeId && list.id !== scopeId) continue;
     const listName = list.name || list.id;
     const items = listItemsByListId.get(list.id) || [];
     for (const item of items) {
-      let description = listName;
+      const prefixParts = [];
+      if (instanceLabel) {
+        prefixParts.push(instanceLabel);
+      }
+      if (includeListLabel) {
+        prefixParts.push(listName);
+      }
+      const prefix = prefixParts.join(" / ");
+      let description = prefix || undefined;
       if (showNotesPreview && item && typeof item.notes === "string" && item.notes.trim()) {
-        description = `${listName} - ${normalizeWhitespace(item.notes)}`;
+        const notesText = normalizeWhitespace(item.notes);
+        description = prefix ? `${prefix} - ${notesText}` : notesText;
       }
       entries.push({
         listId: list.id,

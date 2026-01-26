@@ -104,12 +104,21 @@ interface AssistantState {
   selectedListId?: string;
 }
 
+interface PersistedState {
+  includeMode?: IncludeMode;
+  mode?: PickerMode;
+  instanceId?: string;
+  selectedListId?: string;
+}
+
 interface PickerEntry {
+  instanceId: string;
   key: string;
   kind: "list" | "note";
   title: string;
   description?: string;
   listId?: string;
+  listName?: string;
   item?: ListItem;
   note?: NoteSummary;
 }
@@ -149,6 +158,10 @@ const DEFAULT_THEME: PickerTheme = {
 };
 
 const LIST_ITEMS_LIMIT = 200;
+const ALL_INSTANCES = "__all__";
+const ALL_LISTS = "__all__";
+const ALL_INSTANCES_LABEL = "All instances";
+const ALL_LISTS_LABEL = "All lists";
 
 function loadConfig(): AssistantConfig {
   const configPath = path.join(os.homedir(), ".pi", "agent", "extensions", "assistant", "config.json");
@@ -162,6 +175,36 @@ function loadConfig(): AssistantConfig {
     // Ignore errors, use default
   }
   return DEFAULT_CONFIG;
+}
+
+function loadPersistedState(): PersistedState {
+  const statePath = path.join(os.homedir(), ".pi", "agent", "extensions", "assistant", "state.json");
+  try {
+    if (fs.existsSync(statePath)) {
+      const content = fs.readFileSync(statePath, "utf-8");
+      const parsed = JSON.parse(content) as PersistedState;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    }
+  } catch {
+    // Ignore errors, use defaults
+  }
+  return {};
+}
+
+function persistState(state: AssistantState): void {
+  const statePath = path.join(os.homedir(), ".pi", "agent", "extensions", "assistant", "state.json");
+  const payload: PersistedState = {
+    includeMode: state.includeMode,
+    mode: state.mode,
+    instanceId: state.instanceId,
+    selectedListId: state.selectedListId,
+  };
+  try {
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, JSON.stringify(payload, null, 2), "utf-8");
+  } catch {
+    // Ignore persistence errors
+  }
 }
 
 function resolveAssistantUrl(config: AssistantConfig): string | null {
@@ -464,7 +507,7 @@ class AssistantPickerComponent {
   private instanceIds: string[];
   private instanceIndex = 0;
   private listIndex = 0;
-  private menuMode: "list" | "instance" | null = null;
+  private menuMode: "list" | "instance" | "include" | null = null;
   private menuQuery = "";
   private menuFiltered: MenuEntry[] = [];
   private menuSelectedIndex = 0;
@@ -476,7 +519,8 @@ class AssistantPickerComponent {
     private listInstanceIds: Set<string>,
     private noteInstanceIds: Set<string>,
     private done: (result: PickerResult) => void,
-  private onSelectionChange: () => void
+    private onSelectionChange: () => void,
+    private onStateChange: () => void
   ) {
     this.instanceIds = Array.from(instances.keys());
     if (this.instanceIds.length === 0) {
@@ -487,6 +531,9 @@ class AssistantPickerComponent {
     this.state.instanceId = this.instanceIds[this.instanceIndex] ?? this.state.instanceId;
 
     this.ensureInstanceForMode();
+    if (this.state.instanceId === ALL_INSTANCES) {
+      this.state.selectedListId = ALL_LISTS;
+    }
     const activeLists = this.getActiveLists();
     if (activeLists.length > 0) {
       const listIndex = activeLists.findIndex((list) => list.id === this.state.selectedListId);
@@ -588,6 +635,23 @@ class AssistantPickerComponent {
       return;
     }
 
+    if (matchesKey(data, "return")) {
+      const option = options[this.selectedOption];
+      if (option?.id === "list") {
+        this.openMenu("list");
+        return;
+      }
+      if (option?.id === "instance") {
+        this.openMenu("instance");
+        return;
+      }
+      if (option?.id === "include") {
+        this.openMenu("include");
+        return;
+      }
+      return;
+    }
+
     if (matchesKey(data, "up")) {
       this.selectedOption = this.selectedOption === 0 ? options.length - 1 : this.selectedOption - 1;
       return;
@@ -620,19 +684,38 @@ class AssistantPickerComponent {
       if (entry) {
         if (this.menuMode === "instance") {
           this.state.instanceId = entry.id;
-          this.ensureInstanceForMode();
-          const activeLists = this.getActiveLists();
-          if (activeLists.length > 0) {
+          if (this.state.instanceId === ALL_INSTANCES) {
             this.listIndex = 0;
-            this.state.selectedListId = activeLists[0]?.id;
+            this.state.selectedListId = ALL_LISTS;
           } else {
-            this.state.selectedListId = undefined;
+            this.ensureInstanceForMode();
+            const activeLists = this.getActiveLists();
+            if (activeLists.length > 0) {
+              const existingIndex = this.state.selectedListId
+                ? activeLists.findIndex((list) => list.id === this.state.selectedListId)
+                : -1;
+              if (existingIndex >= 0) {
+                this.listIndex = existingIndex;
+              } else {
+                this.listIndex = 0;
+                this.state.selectedListId = activeLists[0]?.id;
+              }
+            } else {
+              this.state.selectedListId = ALL_LISTS;
+            }
           }
+          this.onStateChange();
         } else if (this.menuMode === "list") {
           this.state.selectedListId = entry.id;
           const lists = this.getActiveLists();
           const index = lists.findIndex((list) => list.id === entry.id);
           this.listIndex = index >= 0 ? index : 0;
+          this.onStateChange();
+        } else if (this.menuMode === "include") {
+          if (entry.id === "metadata" || entry.id === "content") {
+            this.state.includeMode = entry.id;
+            this.onStateChange();
+          }
         }
         this.updateFilter();
       }
@@ -670,11 +753,19 @@ class AssistantPickerComponent {
     }
   }
 
-  private openMenu(mode: "list" | "instance"): void {
+  private openMenu(mode: "list" | "instance" | "include"): void {
     this.menuMode = mode;
     this.menuQuery = "";
-    this.menuSelectedIndex = 0;
     this.updateMenuFilter();
+    const currentId = mode === "instance"
+      ? this.getActiveInstanceId()
+      : mode === "list"
+        ? this.state.selectedListId
+        : this.state.includeMode;
+    const index = currentId
+      ? this.menuFiltered.findIndex((entry) => entry.id === currentId)
+      : -1;
+    this.menuSelectedIndex = index >= 0 ? index : 0;
   }
 
   private closeMenu(): void {
@@ -686,14 +777,31 @@ class AssistantPickerComponent {
 
   private getMenuEntries(): MenuEntry[] {
     if (this.menuMode === "instance") {
-      return this.getInstanceChoices().map((id) => ({ id, label: id }));
+      const choices = this.getInstanceChoices(false);
+      return [
+        { id: ALL_INSTANCES, label: ALL_INSTANCES_LABEL },
+        ...choices.map((id) => ({ id, label: id })),
+      ];
     }
 
     if (this.menuMode === "list") {
-      return this.getActiveLists().map((list) => ({
-        id: list.id,
-        label: list.name || list.id,
-      }));
+      if (this.state.instanceId === ALL_INSTANCES) {
+        return [{ id: ALL_LISTS, label: ALL_LISTS_LABEL }];
+      }
+      return [
+        { id: ALL_LISTS, label: ALL_LISTS_LABEL },
+        ...this.getActiveLists().map((list) => ({
+          id: list.id,
+          label: list.name || list.id,
+        })),
+      ];
+    }
+
+    if (this.menuMode === "include") {
+      return [
+        { id: "metadata", label: "Metadata" },
+        { id: "content", label: "Content" },
+      ];
     }
 
     return [];
@@ -726,11 +834,13 @@ class AssistantPickerComponent {
       this.selectedIndex = 0;
       this.selectedOption = 0;
       this.updateFilter();
+      this.onStateChange();
       return;
     }
 
     if (option.id === "include") {
       this.state.includeMode = this.state.includeMode === "metadata" ? "content" : "metadata";
+      this.onStateChange();
       return;
     }
 
@@ -746,33 +856,55 @@ class AssistantPickerComponent {
           : nextIndex;
       this.state.instanceId = choices[wrappedIndex] ?? this.state.instanceId;
       this.instanceIndex = Math.max(0, this.instanceIds.findIndex((id) => id === this.state.instanceId));
-      const activeLists = this.getActiveLists();
-      if (activeLists.length > 0) {
+      if (this.state.instanceId === ALL_INSTANCES) {
         this.listIndex = 0;
-        this.state.selectedListId = activeLists[0]?.id;
+        this.state.selectedListId = ALL_LISTS;
       } else {
-        this.state.selectedListId = undefined;
+        const activeLists = this.getActiveLists();
+        if (activeLists.length > 0) {
+          const existingIndex = this.state.selectedListId
+            ? activeLists.findIndex((list) => list.id === this.state.selectedListId)
+            : -1;
+          if (existingIndex >= 0) {
+            this.listIndex = existingIndex;
+          } else {
+            this.listIndex = 0;
+            this.state.selectedListId = activeLists[0]?.id;
+          }
+        } else {
+          this.state.selectedListId = ALL_LISTS;
+        }
       }
       this.query = "";
       this.selectedIndex = 0;
       this.updateFilter();
+      this.onStateChange();
       return;
     }
 
     if (option.id === "list") {
-      const lists = this.getActiveLists();
-      if (lists.length === 0) return;
-      const nextIndex = this.listIndex + direction;
+      const choices = this.getListChoices();
+      if (choices.length === 0) return;
+      const currentIndex = Math.max(0, choices.findIndex((id) => id === (this.state.selectedListId ?? ALL_LISTS)));
+      const nextIndex = currentIndex + direction;
       const wrappedIndex = nextIndex < 0
-        ? lists.length - 1
-        : nextIndex >= lists.length
+        ? choices.length - 1
+        : nextIndex >= choices.length
           ? 0
           : nextIndex;
-      this.listIndex = wrappedIndex;
-      this.state.selectedListId = lists[this.listIndex]?.id;
+      const nextId = choices[wrappedIndex] ?? ALL_LISTS;
+      this.state.selectedListId = nextId;
+      if (this.state.selectedListId === ALL_LISTS) {
+        this.listIndex = 0;
+      } else {
+        const lists = this.getActiveLists();
+        const index = lists.findIndex((list) => list.id === this.state.selectedListId);
+        this.listIndex = index >= 0 ? index : 0;
+      }
       this.query = "";
       this.selectedIndex = 0;
       this.updateFilter();
+      this.onStateChange();
     }
   }
 
@@ -780,26 +912,60 @@ class AssistantPickerComponent {
     return this.state.instanceId || this.instanceIds[this.instanceIndex] || "default";
   }
 
-  private getInstanceChoices(): string[] {
+  private getInstanceChoices(includeAll = true): string[] {
     if (this.state.mode === "lists" && this.listInstanceIds.size > 0) {
-      const choices = this.instanceIds.filter((id) => this.listInstanceIds.has(id));
-      return choices.length > 0 ? choices : this.instanceIds;
+      const base = this.instanceIds.filter((id) => this.listInstanceIds.has(id));
+      const choices = base.length > 0 ? base : this.instanceIds;
+      return includeAll ? [ALL_INSTANCES, ...choices] : choices;
     }
     if (this.state.mode === "notes" && this.noteInstanceIds.size > 0) {
-      const choices = this.instanceIds.filter((id) => this.noteInstanceIds.has(id));
-      return choices.length > 0 ? choices : this.instanceIds;
+      const base = this.instanceIds.filter((id) => this.noteInstanceIds.has(id));
+      const choices = base.length > 0 ? base : this.instanceIds;
+      return includeAll ? [ALL_INSTANCES, ...choices] : choices;
     }
-    return this.instanceIds;
+    return includeAll ? [ALL_INSTANCES, ...this.instanceIds] : this.instanceIds;
   }
 
   private ensureInstanceForMode(): void {
-    const choices = this.getInstanceChoices();
+    if (this.state.instanceId === ALL_INSTANCES) {
+      return;
+    }
+    const choices = this.getInstanceChoices(false);
     if (choices.length === 0) return;
     if (!choices.includes(this.state.instanceId)) {
       this.state.instanceId = choices[0];
     }
     const index = this.instanceIds.findIndex((id) => id === this.state.instanceId);
     this.instanceIndex = index >= 0 ? index : 0;
+  }
+
+  private getInstanceScopeIds(): string[] {
+    if (this.state.instanceId === ALL_INSTANCES) {
+      const choices = this.getInstanceChoices(false);
+      return choices.length > 0 ? choices : this.instanceIds;
+    }
+    return [this.state.instanceId];
+  }
+
+  private getListScopeId(): string | null {
+    if (this.state.mode !== "lists") return null;
+    if (this.state.instanceId === ALL_INSTANCES) {
+      return null;
+    }
+    if (!this.state.selectedListId || this.state.selectedListId === ALL_LISTS) {
+      return null;
+    }
+    return this.state.selectedListId;
+  }
+
+  private getListChoices(): string[] {
+    if (this.state.mode !== "lists") return [];
+    if (this.state.instanceId === ALL_INSTANCES) {
+      return [ALL_LISTS];
+    }
+    const lists = this.getActiveLists();
+    const ids = lists.map((list) => list.id);
+    return [ALL_LISTS, ...ids];
   }
 
   private getActiveData(): InstanceData {
@@ -818,54 +984,98 @@ class AssistantPickerComponent {
   private getActiveList(): ListSummary | null {
     const lists = this.getActiveLists();
     if (lists.length === 0) return null;
+    if (this.state.instanceId === ALL_INSTANCES) {
+      return null;
+    }
     const selectedId = this.state.selectedListId;
-    if (selectedId) {
+    if (selectedId && selectedId !== ALL_LISTS) {
       return lists.find((list) => list.id === selectedId) ?? lists[0] ?? null;
     }
     return lists[0] ?? null;
   }
 
   private getEntries(): PickerEntry[] {
+    const queryActive = this.query.trim().length > 0;
     if (this.state.mode === "notes") {
-      return this.getActiveNotes().map((note) => {
-        const description = note.description
-          ? normalizeWhitespace(note.description)
-          : note.tags
-            ? note.tags.join(", ")
-            : undefined;
-        const key = noteSelectionKey(this.getActiveInstanceId(), note.title);
-        return {
-          key,
-          kind: "note",
-          title: note.title,
-          ...(description ? { description } : {}),
-          note,
-        };
-      });
+      if (this.state.instanceId === ALL_INSTANCES && !queryActive) {
+        return [];
+      }
+
+      const instanceIds = this.getInstanceScopeIds();
+      const includeInstanceLabel = instanceIds.length > 1 || this.state.instanceId === ALL_INSTANCES;
+      const entries: PickerEntry[] = [];
+
+      for (const instanceId of instanceIds) {
+        const data = this.instances.get(instanceId);
+        const notes = data?.notes ?? [];
+        for (const note of notes) {
+          const baseDescription = note.description
+            ? normalizeWhitespace(note.description)
+            : note.tags
+              ? note.tags.join(", ")
+              : "";
+          const description = includeInstanceLabel
+            ? baseDescription
+              ? `${instanceId} - ${baseDescription}`
+              : instanceId
+            : baseDescription || undefined;
+          const key = noteSelectionKey(instanceId, note.title);
+          entries.push({
+            instanceId,
+            key,
+            kind: "note",
+            title: note.title,
+            ...(description ? { description } : {}),
+            note,
+          });
+        }
+      }
+
+      return entries;
     }
 
-    const list = this.getActiveList();
-    const listEntries = buildListItemEntries(
-      this.getActiveLists(),
-      this.getActiveData().listItemsByListId,
-      list?.id,
-      this.query,
-      this.showListNotesPreview
-    );
-    return listEntries.map((entry) => {
-      const itemId = entry.item.id ?? "";
-      const key = itemId
-        ? listSelectionKey(this.getActiveInstanceId(), entry.listId, itemId)
-        : `list:${entry.listId}:${entry.item.title}`;
-      return {
-        key,
-        kind: "list",
-        title: entry.item.title,
-        ...(entry.description ? { description: entry.description } : {}),
-        listId: entry.listId,
-        item: entry.item,
-      };
-    });
+    if (!queryActive && this.getListScopeId() === null) {
+      return [];
+    }
+
+    const listScopeId = this.getListScopeId();
+    const instanceIds = this.getInstanceScopeIds();
+    const includeInstanceLabel = instanceIds.length > 1 || this.state.instanceId === ALL_INSTANCES;
+    const includeListLabel = listScopeId === null;
+    const entries: PickerEntry[] = [];
+
+    for (const instanceId of instanceIds) {
+      const data = this.instances.get(instanceId);
+      if (!data) continue;
+      const listEntries = buildListItemEntries(
+        data.lists,
+        data.listItemsByListId,
+        listScopeId,
+        this.showListNotesPreview,
+        {
+          includeListLabel,
+          instanceLabel: includeInstanceLabel ? instanceId : undefined,
+        }
+      );
+      for (const entry of listEntries) {
+        const itemId = entry.item.id ?? "";
+        const key = itemId
+          ? listSelectionKey(instanceId, entry.listId, itemId)
+          : `list:${instanceId}:${entry.listId}:${entry.item.title}`;
+        entries.push({
+          instanceId,
+          key,
+          kind: "list",
+          title: entry.item.title,
+          ...(entry.description ? { description: entry.description } : {}),
+          listId: entry.listId,
+          listName: entry.listName,
+          item: entry.item,
+        });
+      }
+    }
+
+    return entries;
   }
 
   private updateFilter(): void {
@@ -876,10 +1086,10 @@ class AssistantPickerComponent {
 
   private toggleSelection(entry: PickerEntry): void {
     if (entry.kind === "list") {
-      const list = this.getActiveList();
       const item = entry.item;
-      if (!list || !item || !item.id) return;
-      const key = listSelectionKey(this.getActiveInstanceId(), list.id, item.id);
+      if (!item || !item.id || !entry.listId) return;
+      const instanceId = entry.instanceId || this.getActiveInstanceId();
+      const key = listSelectionKey(instanceId, entry.listId, item.id);
       if (this.state.selections.has(key)) {
         this.state.selections.delete(key);
         this.state.order = this.state.order.filter((existing) => existing !== key);
@@ -887,9 +1097,9 @@ class AssistantPickerComponent {
         this.state.selections.set(key, {
           key,
           kind: "list",
-          instanceId: this.getActiveInstanceId(),
-          listId: list.id,
-          listName: list.name,
+          instanceId,
+          listId: entry.listId,
+          listName: entry.listName,
           item,
         });
         this.state.order.push(key);
@@ -900,7 +1110,8 @@ class AssistantPickerComponent {
 
     if (entry.kind === "note" && entry.note) {
       const note = entry.note;
-      const key = noteSelectionKey(this.getActiveInstanceId(), note.title);
+      const instanceId = entry.instanceId || this.getActiveInstanceId();
+      const key = noteSelectionKey(instanceId, note.title);
       if (this.state.selections.has(key)) {
         this.state.selections.delete(key);
         this.state.order = this.state.order.filter((existing) => existing !== key);
@@ -908,7 +1119,7 @@ class AssistantPickerComponent {
         this.state.selections.set(key, {
           key,
           kind: "note",
-          instanceId: this.getActiveInstanceId(),
+          instanceId,
           note,
         });
         this.state.order.push(key);
@@ -928,19 +1139,25 @@ class AssistantPickerComponent {
 
     if (this.state.mode === "lists") {
       const list = this.getActiveList();
+      const listValue = this.state.selectedListId === ALL_LISTS || this.state.instanceId === ALL_INSTANCES || !list
+        ? ALL_LISTS_LABEL
+        : list.name ?? "None";
       options.push({
         id: "list",
         label: "List",
-        value: list ? list.name : "None",
+        value: listValue,
       });
     }
 
     const instanceChoices = this.getInstanceChoices();
     if (instanceChoices.length > 1) {
+      const instanceValue = this.state.instanceId === ALL_INSTANCES
+        ? ALL_INSTANCES_LABEL
+        : this.getActiveInstanceId();
       options.push({
         id: "instance",
         label: "Instance",
-        value: this.getActiveInstanceId(),
+        value: instanceValue,
       });
     }
 
@@ -985,18 +1202,41 @@ class AssistantPickerComponent {
 
     const isMenu = this.menuMode !== null;
     const queryDisplay = isMenu
-      ? this.menuQuery || placeholder(`type to ${this.menuMode === "list" ? "filter lists" : "filter instances"}...`)
+      ? this.menuQuery || placeholder(
+        `type to ${
+          this.menuMode === "list"
+            ? "filter lists"
+            : this.menuMode === "include"
+              ? "filter modes"
+              : "filter instances"
+        }...`
+      )
       : this.query || placeholder("type to filter...");
-    lines.push(row(`${isMenu ? (this.menuMode === "list" ? "Filter lists" : "Filter instances") : "Search"}: ${queryDisplay}`));
+    const searchLabel = isMenu
+      ? this.menuMode === "list"
+        ? "Filter lists"
+        : this.menuMode === "include"
+          ? "Filter mode"
+          : "Filter instances"
+      : "Search";
+    lines.push(row(`${searchLabel}: ${queryDisplay}`));
 
     lines.push(border("+" + "-".repeat(innerW) + "+"));
 
     const modeLabel = this.state.mode === "lists" ? "Lists" : "Notes";
-    const listLabel = this.state.mode === "lists" ? (this.getActiveList()?.name ?? "None") : "-";
-    const contextLine = `Mode: ${modeLabel} | List: ${listLabel} | Instance: ${this.getActiveInstanceId()}`;
+    const listLabel = this.state.mode === "lists"
+      ? this.state.selectedListId === ALL_LISTS || this.state.instanceId === ALL_INSTANCES
+        ? ALL_LISTS_LABEL
+        : this.getActiveList()?.name ?? "None"
+      : "-";
+    const instanceLabel = this.state.instanceId === ALL_INSTANCES
+      ? ALL_INSTANCES_LABEL
+      : this.getActiveInstanceId();
+    const contextLine = `Mode: ${modeLabel} | List: ${listLabel} | Instance: ${instanceLabel}`;
     lines.push(row(truncate(contextLine, innerW - 1)));
 
     const entries = this.menuMode ? this.menuFiltered : this.filtered;
+    const queryActive = this.query.trim().length > 0;
     const cursorIndex = this.menuMode ? this.menuSelectedIndex : this.selectedIndex;
     const maxVisible = 8;
     const startIndex = Math.max(
@@ -1007,10 +1247,14 @@ class AssistantPickerComponent {
 
     if (entries.length === 0) {
       const emptyLabel = this.menuMode
-        ? `No ${this.menuMode === "list" ? "lists" : "instances"}`
+        ? `No ${this.menuMode === "list" ? "lists" : this.menuMode === "include" ? "modes" : "instances"}`
         : this.state.mode === "lists"
-          ? "No list items"
-          : "No notes";
+          ? (!queryActive && this.getListScopeId() === null
+            ? "Select a list or type to search"
+            : "No list items")
+          : (!queryActive && this.state.instanceId === ALL_INSTANCES
+            ? "Type to search all instances"
+            : "No notes");
       lines.push(row(hint(emptyLabel)));
     } else if (this.menuMode) {
       for (let i = startIndex; i < endIndex; i++) {
@@ -1216,14 +1460,15 @@ async function buildSelectionBlocks(
 
 const config = loadConfig();
 const resolvedUrl = resolveAssistantUrl(config);
+const persistedState = loadPersistedState();
 
 const state: AssistantState = {
   selections: new Map(),
   order: [],
-  includeMode: config.includeMode ?? "metadata",
-  mode: "lists",
-  instanceId: config.defaultInstance ?? "default",
-  selectedListId: undefined,
+  includeMode: persistedState.includeMode ?? config.includeMode ?? "metadata",
+  mode: persistedState.mode ?? "lists",
+  instanceId: persistedState.instanceId ?? config.defaultInstance ?? "default",
+  selectedListId: persistedState.selectedListId,
 };
 
 export default function assistantExtension(pi: ExtensionAPI): void {
@@ -1269,6 +1514,9 @@ export default function assistantExtension(pi: ExtensionAPI): void {
               const summary = formatSelectionSummary(state);
               ctx.ui.setStatus("assistant", summary.status);
               ctx.ui.setWidget("assistant", summary.widget);
+            },
+            () => {
+              persistState(state);
             }
           ),
         { overlay: true }

@@ -5,6 +5,9 @@
 ### Added
 - **assistant**: Add Assistant list/notes picker with metadata/content injection via `/assistant`
 
+### Changed
+- **assistant**: Add list/instance/include pickers, scoped search with all-list/instance modes, and persisted picker state
+
 ## [0.2.3] - 2026-01-23
 
 ### Added

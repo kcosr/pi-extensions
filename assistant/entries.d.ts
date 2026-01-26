@@ -26,7 +26,10 @@ export function normalizeWhitespace(value: string): string;
 export function buildListItemEntries(
   lists: ListSummary[],
   listItemsByListId: Map<string, ListItem[]>,
-  activeListId: string | undefined,
-  query: string,
-  showNotesPreview: boolean
+  listScopeId: string | null | undefined,
+  showNotesPreview: boolean,
+  options?: {
+    includeListLabel?: boolean;
+    instanceLabel?: string;
+  }
 ): ListItemEntry[];
