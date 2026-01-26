@@ -5,7 +5,7 @@ agent prompt via the `/assistant` command.
 
 ## Requirements
 
-- Assistant server running with `lists` and `notes` plugins enabled.
+- Assistant app from `https://github.com/kcosr/assistant` running with `lists` and `notes` plugins enabled.
 - Set `ASSISTANT_URL` or `assistantUrl` in the config.
 
 ## Installation
