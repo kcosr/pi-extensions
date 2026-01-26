@@ -1,0 +1,12 @@
+{
+  "name": "assistant",
+  "version": "0.1.0",
+  "description": "Assistant list/notes picker and injection extension for pi",
+  "main": "index.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kcosr/pi-extensions"
+  },
+  "author": "kcosr",
+  "license": "MIT"
+}
