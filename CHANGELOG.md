@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **assistant**: Add Assistant list/notes picker with metadata/content injection via `/assistant`
+
 ## [0.2.3] - 2026-01-23
 
 ### Added

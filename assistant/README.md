@@ -1,0 +1,91 @@
+# assistant
+
+A command palette for selecting Assistant list items and notes and injecting them into the next
+agent prompt via the `/assistant` command.
+
+## Requirements
+
+- Assistant server running with `lists` and `notes` plugins enabled.
+- Set `ASSISTANT_URL` or `assistantUrl` in the config.
+
+## Installation
+
+1. Copy the extension into your pi extensions directory:
+   ```bash
+   cp -R /path/to/pi-extensions/assistant ~/.pi/agent/extensions/assistant
+   ```
+2. Restart pi (or reload extensions).
+
+## Usage
+
+Open the picker:
+
+```
+/assistant
+```
+
+Selected items are injected into your next message.
+
+If a selected instance is only available for lists or notes, the other section will appear empty.
+
+## Keyboard Shortcuts
+
+| Key | Action |
+| --- | --- |
+| `Up` / `Down` | Navigate entries |
+| `Space` | Toggle selection |
+| `Enter` | Confirm and close |
+| `Tab` | Toggle options focus |
+| `Esc` | Close |
+
+## Output Modes
+
+- **Metadata** (default)
+  - List items are formatted like the Assistant web UI copy/paste export.
+  - Notes include a metadata block (title, tags, description).
+- **Content**
+  - List items include YAML frontmatter metadata and notes content (if present).
+  - Notes include YAML frontmatter metadata plus raw markdown content.
+
+## Configuration
+
+Create `~/.pi/agent/extensions/assistant/config.json`:
+
+```json
+{
+  "assistantUrl": "http://localhost:3000",
+  "defaultInstance": "default",
+  "includeMode": "metadata",
+  "showListNotesPreview": true
+}
+```
+
+Environment override:
+- `ASSISTANT_URL` overrides `assistantUrl`.
+
+## Theming
+
+Create `~/.pi/agent/extensions/assistant/theme.json` to customize colors:
+
+```json
+{
+  "border": "2",
+  "title": "2",
+  "selected": "36",
+  "selectedText": "36",
+  "placeholder": "2",
+  "hint": "2",
+  "option": "2",
+  "optionSelected": "36"
+}
+```
+
+Color codes are ANSI escape codes (e.g., "36" = cyan).
+
+## Testing
+
+Run the format helper tests:
+
+```bash
+node --test assistant/format.test.js
+```
