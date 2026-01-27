@@ -9,12 +9,9 @@
     { 
       "comment": "manual approval for env files", 
       "match": { "params.path": "/\\.env/" }, 
-      "action": "plugin", 
-      "plugin": "manual" 
+      "action": "manual"
     },
     { "comment": "allow everything else", "action": "allow" }
   ],
-  "plugins": {
-    "manual": "./plugins/manual.ts"
-  }
+  "plugins": {}
 }

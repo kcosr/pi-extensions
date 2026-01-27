@@ -1,0 +1,31 @@
+{
+  "name": "@pi-extensions/toolwatch",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "postinstall": "cd common && npm install && npm run build",
+    "sync-common": "cp -r ../common/src common/ && cp ../common/package.json common/ && cd common && npm run build",
+    "build": "esbuild index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:@mariozechner/pi-coding-agent --external:node:*",
+    "dist": "npm run sync-common && npm run build && mkdir -p dist && cp config.json dist/",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@pi-extensions/toolwatch-common": "file:./common"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "esbuild": "^0.27.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.3"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": ">=0.8.0"
+  },
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-coding-agent": {
+      "optional": true
+    }
+  }
+}
