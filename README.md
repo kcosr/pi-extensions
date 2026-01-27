@@ -44,6 +44,7 @@ Reload pi after installing.
 | Extension | Description |
 |-----------|-------------|
 | [codemap](codemap/) | File browser for selecting files/directories to pass to `codemap` via `/codemap`. |
+| [apply-patch-tool](apply-patch-tool/) | Codex-style `apply_patch` tool with prompt guidance injection. |
 | [assistant](assistant/) | Browse Assistant lists and notes with fuzzy search and inject selections via `/assistant`. |
 | [skill-picker](skill-picker/) | Command palette for selecting and queueing skills explicitly via `/skill` command. Hard fork of [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette). |
 | [toolwatch](toolwatch/) | Tool call auditing and approval system. Log all tool calls to SQLite, block dangerous commands, require manual approval for sensitive operations. |

@@ -6,6 +6,7 @@
 
 ### Added
 - **assistant**: Add Assistant list/notes picker with metadata/content injection via `/assistant`
+- **apply-patch-tool**: Add Codex-style `apply_patch` tool extension with prompt guidance injection
 - **toolwatch**: Local rules evaluation mode
   - New `common/` module with shared types and rules engine
   - Extension now supports `rules.mode: "local"` for local policy enforcement without collector
@@ -21,6 +22,7 @@
 - **assistant**: Insert selections into the editor on confirm (codemap-style Enter behavior)
 - **assistant**: Include list item custom fields in injected metadata/content blocks
 - **assistant**: Format list item notes with User/Agent headings and expand custom fields into frontmatter keys
+- **apply-patch-tool**: Append unified diffs to tool output
 - **toolwatch**: Refactored extension and collector to use shared `common` module
   - Types, rules engine, and plugin loader extracted to `@pi-extensions/toolwatch-common`
   - Extension restructured into `src/` subdirectory with config, evaluator, audit modules
