@@ -1,58 +1,33 @@
+/**
+ * Plugin loader for collector.
+ * Wraps common plugin-loader with collector-specific path resolution.
+ */
+
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ApprovalPlugin, Config } from "./types.js";
+import {
+  registerPlugin as commonRegisterPlugin,
+  loadPlugin as commonLoadPlugin,
+  clearPluginCache,
+  type ApprovalPlugin,
+  type CollectorConfig,
+} from "@pi-extensions/toolwatch-common";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.dirname(__dirname);
 
-// Cache loaded plugins
-const pluginCache = new Map<string, ApprovalPlugin>();
+// Re-export common functions
+export { clearPluginCache };
+export const registerPlugin = commonRegisterPlugin;
 
 /**
- * Pre-register a plugin (used to share instances between static and dynamic imports)
+ * Load a plugin by name from config.
+ * Resolves paths relative to collector root.
  */
-export function registerPlugin(name: string, plugin: ApprovalPlugin): void {
-  pluginCache.set(name, plugin);
-}
-
-/**
- * Load a plugin by name from config
- */
-export async function loadPlugin(name: string, config: Config): Promise<ApprovalPlugin | undefined> {
-  // Check cache first (includes pre-registered plugins)
-  if (pluginCache.has(name)) {
-    return pluginCache.get(name);
-  }
-
+export async function loadPlugin(
+  name: string,
+  config: CollectorConfig
+): Promise<ApprovalPlugin | undefined> {
   const pluginPath = config.plugins[name];
-  if (!pluginPath) {
-    console.error(`Plugin not found in config: ${name}`);
-    return undefined;
-  }
-
-  // Resolve path relative to collector root
-  const fullPath = path.resolve(rootDir, pluginPath);
-
-  try {
-    const module = await import(fullPath);
-    const plugin = module.default as ApprovalPlugin;
-
-    if (!plugin || typeof plugin.evaluate !== "function") {
-      console.error(`Invalid plugin (missing evaluate function): ${name}`);
-      return undefined;
-    }
-
-    pluginCache.set(name, plugin);
-    return plugin;
-  } catch (err) {
-    console.error(`Failed to load plugin ${name} from ${fullPath}:`, err);
-    return undefined;
-  }
-}
-
-/**
- * Clear the plugin cache (useful for reloading)
- */
-export function clearPluginCache(): void {
-  pluginCache.clear();
+  return commonLoadPlugin(name, pluginPath, rootDir);
 }

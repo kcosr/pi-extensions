@@ -1,13 +1,27 @@
 {
-  "mode": "http-with-fallback",
-  "http": {
-    "url": "http://localhost:9999/events",
-    "sync": true,
-    "timeoutMs": 30000,
-    "timeoutAction": "block"
+  "rules": {
+    "mode": "local",
+    "rules": [
+      {
+        "comment": "Block dangerous bash commands",
+        "match": { "tool": "bash", "params.command": ["/rm\\s+-rf/", "/sudo/", "/shutdown/", "/reboot/"] },
+        "action": "deny",
+        "reason": "Dangerous commands (rm -rf, sudo, shutdown, reboot) are not allowed"
+      },
+      {
+        "comment": "Manual approval for env files",
+        "match": { "params.path": "/\\.env/" },
+        "action": "manual"
+      },
+      {
+        "comment": "Allow everything else",
+        "action": "allow"
+      }
+    ]
   },
-  "file": {
-    "path": "/tmp/toolwatch.jsonl"
+  "audit": {
+    "mode": "file",
+    "file": { "path": "/tmp/toolwatch.jsonl" }
   },
-  "tools": ["bash", "read", "grep"]
+  "tools": []
 }

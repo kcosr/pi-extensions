@@ -3,12 +3,14 @@
   "version": "0.2.3",
   "type": "module",
   "scripts": {
+    "postinstall": "cd ../common && npm install && npm run build",
     "dev": "tsx watch src/index.ts",
     "start": "node --experimental-strip-types src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@pi-extensions/toolwatch-common": "file:../common",
     "@types/ws": "^8.18.1",
     "better-sqlite3": "^11.7.0",
     "ws": "^8.19.0"

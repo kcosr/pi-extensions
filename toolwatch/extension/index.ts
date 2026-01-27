@@ -1,25 +1,24 @@
 /**
  * Toolwatch Extension
  *
- * Captures tool calls and results for auditing.
- * Supports HTTP, file (JSONL), or both with configurable modes.
- * Supports sync mode for approval workflows.
+ * Captures tool calls and results for auditing and policy enforcement.
+ * Supports local and remote rules evaluation with configurable audit logging.
+ *
+ * Note: Types from @mariozechner/pi-coding-agent are resolved at runtime via pi's jiti loader.
+ * TypeScript type checking is disabled for these imports.
  */
 
-import fs from "node:fs";
 import os from "node:os";
+// @ts-ignore - types provided at runtime by pi
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+// @ts-ignore - types provided at runtime by pi
 import { isBashToolResult } from "@mariozechner/pi-coding-agent";
-import {
-  loadConfig,
-  getUser,
-  filterParams,
-  type Config,
-  type ToolwatchEvent,
-  type ToolCallEvent,
-  type ToolResultEvent,
-  type ApprovalResponse,
-} from "./lib.js";
+import type { ToolCallEvent, ToolResultEvent } from "@pi-extensions/toolwatch-common";
+
+import { loadConfig } from "./src/config.js";
+import { evaluateLocal, evaluateRemote } from "./src/evaluator.js";
+import { sendAuditEvent } from "./src/audit.js";
+import { getUser, filterParams } from "./src/utils.js";
 
 export default function (pi: ExtensionAPI) {
   const config = loadConfig();
@@ -29,82 +28,19 @@ export default function (pi: ExtensionAPI) {
   // Track call timestamps for duration calculation
   const callTimestamps = new Map<string, number>();
 
-  // Send event (async, fire-and-forget)
-  function sendEventAsync(event: ToolwatchEvent): void {
-    const payload = JSON.stringify(event);
-
-    switch (config.mode) {
-      case "http":
-        sendHttpAsync(config, payload);
-        break;
-
-      case "file":
-        writeFile(config, payload);
-        break;
-
-      case "both":
-        sendHttpAsync(config, payload);
-        writeFile(config, payload);
-        break;
-
-      case "http-with-fallback":
-        sendHttpWithFallback(config, payload);
-        break;
-    }
-  }
-
-  // Send event (sync, wait for approval response)
-  async function sendEventSync(event: ToolCallEvent): Promise<ApprovalResponse> {
-    const payload = JSON.stringify(event);
-
-    // Only HTTP modes support sync
-    if (config.mode === "file") {
-      writeFile(config, payload);
-      return { approved: true };
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), config.http.timeoutMs);
-
-      const response = await fetch(config.http.url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: payload,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const result = (await response.json()) as ApprovalResponse;
-      return result;
-    } catch (err) {
-      // On timeout or error, apply timeoutAction
-      if (config.mode === "http-with-fallback" || config.mode === "both") {
-        writeFile(config, payload);
-      }
-
-      const isTimeout = err instanceof Error && err.name === "AbortError";
-      const reason = isTimeout ? "Approval timeout" : `Approval error: ${err}`;
-
-      return {
-        approved: config.http.timeoutAction === "allow",
-        reason,
-      };
-    }
-  }
-
-  // Check if tool should be audited
-  function shouldAudit(toolName: string): boolean {
+  // Check if tool should be processed
+  function shouldProcess(toolName: string): boolean {
     return config.tools.length === 0 || config.tools.includes(toolName);
   }
 
-  pi.on("tool_call", async (event, ctx) => {
-    if (!shouldAudit(event.toolName)) return undefined;
+  // Get audit URL for remote rules
+  function getAuditUrl(): string | undefined {
+    return config.audit.http?.url;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pi.on("tool_call", async (event: any, ctx: any) => {
+    if (!shouldProcess(event.toolName)) return undefined;
 
     const ts = Date.now();
     callTimestamps.set(event.toolCallId, ts);
@@ -122,22 +58,57 @@ export default function (pi: ExtensionAPI) {
       params: filterParams(event.toolName, event.input),
     };
 
-    // Sync mode: wait for approval
-    if (config.http.sync && config.mode !== "file") {
-      const approval = await sendEventSync(toolCallEvent);
+    // Evaluate rules based on mode
+    const rulesMode = config.rules.mode;
+
+    if (rulesMode === "local") {
+      // Local rules evaluation
+      const approval = await evaluateLocal(toolCallEvent, config, ctx);
+
+      // Send audit event (async)
+      sendAuditEvent(toolCallEvent, config);
+
       if (!approval.approved) {
         return { block: true, reason: approval.reason ?? "Blocked by toolwatch policy" };
       }
       return undefined;
     }
 
-    // Async mode: fire and forget
-    sendEventAsync(toolCallEvent);
+    if (rulesMode === "remote") {
+      // Remote rules evaluation (sync HTTP to collector)
+      const auditUrl = getAuditUrl();
+      if (!auditUrl) {
+        console.error("[toolwatch] Remote rules mode requires audit.http.url");
+        return { block: true, reason: "Remote rules not configured" };
+      }
+
+      const approval = await evaluateRemote(toolCallEvent, config, auditUrl);
+      const auditFailed = approval.auditFailed === true;
+
+      // Also write to local file if configured (collector handles HTTP audit)
+      const shouldWriteFile =
+        config.audit.mode === "file" ||
+        config.audit.mode === "both" ||
+        (config.audit.mode === "http-with-fallback" && auditFailed);
+
+      if (shouldWriteFile) {
+        sendAuditEvent({ ...toolCallEvent }, { ...config, audit: { ...config.audit, mode: "file" } });
+      }
+
+      if (!approval.approved) {
+        return { block: true, reason: approval.reason ?? "Blocked by toolwatch policy" };
+      }
+      return undefined;
+    }
+
+    // rules.mode === "none" - just audit, no blocking
+    sendAuditEvent(toolCallEvent, config);
     return undefined;
   });
 
-  pi.on("tool_result", async (event) => {
-    if (!shouldAudit(event.toolName)) return undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pi.on("tool_result", async (event: any) => {
+    if (!shouldProcess(event.toolName)) return undefined;
 
     const ts = Date.now();
     const callTs = callTimestamps.get(event.toolCallId);
@@ -155,36 +126,7 @@ export default function (pi: ExtensionAPI) {
     };
 
     // Results are always async (no approval needed)
-    sendEventAsync(toolResultEvent);
+    sendAuditEvent(toolResultEvent, config);
     return undefined;
-  });
-}
-
-// HTTP send (fire and forget)
-function sendHttpAsync(config: Config, payload: string): void {
-  fetch(config.http.url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: payload,
-  }).catch(() => {
-    // Silently ignore HTTP errors
-  });
-}
-
-// File write (fire and forget)
-function writeFile(config: Config, payload: string): void {
-  fs.appendFile(config.file.path, payload + "\n", () => {
-    // Silently ignore write errors
-  });
-}
-
-// HTTP with file fallback
-function sendHttpWithFallback(config: Config, payload: string): void {
-  fetch(config.http.url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: payload,
-  }).catch(() => {
-    writeFile(config, payload);
   });
 }

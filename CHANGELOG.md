@@ -2,14 +2,34 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
 ### Added
 - **assistant**: Add Assistant list/notes picker with metadata/content injection via `/assistant`
+- **toolwatch**: Local rules evaluation mode
+  - New `common/` module with shared types and rules engine
+  - Extension now supports `rules.mode: "local"` for local policy enforcement without collector
+  - Local manual approval plugin (`builtin:manual`) using TUI confirmation dialogs
+  - Separated concerns: `rules` config (local/remote/none) vs `audit` config (none/file/http/both/http-with-fallback)
+  - Legacy config format auto-converted to new format
+  - Design document at `toolwatch/docs/design/local-rules.md`
+  - Bundled distribution via `npm run dist` (no npm install required at destination)
+- **toolwatch**: Collector accepts audit-only HTTP events (`X-Toolwatch-Audit: true`) and records them as approved without rule evaluation
 
 ### Changed
 - **assistant**: Add list/instance/include pickers, scoped search with all-list/instance modes, and persisted picker state
 - **assistant**: Insert selections into the editor on confirm (codemap-style Enter behavior)
 - **assistant**: Include list item custom fields in injected metadata/content blocks
 - **assistant**: Format list item notes with User/Agent headings and expand custom fields into frontmatter keys
+- **toolwatch**: Refactored extension and collector to use shared `common` module
+  - Types, rules engine, and plugin loader extracted to `@pi-extensions/toolwatch-common`
+  - Extension restructured into `src/` subdirectory with config, evaluator, audit modules
+
+### Fixed
+- **toolwatch**: Plugin errors now caught and return default-deny instead of crashing
+- **toolwatch**: Remote rules mode writes audit files for `file`/`both` and uses fallback files only when HTTP evaluation fails for `http-with-fallback`
+
+### Removed
 
 ## [0.2.3] - 2026-01-23
 

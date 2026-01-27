@@ -9,12 +9,22 @@
  */
 
 import fs from "node:fs";
-import { loadConfig } from "./lib.js";
+import { loadConfig } from "./src/config.js";
 
 async function drain() {
   const config = loadConfig();
-  const logPath = config.file.path;
-  const httpUrl = config.http.url;
+  const logPath = config.audit.file?.path;
+  const httpUrl = config.audit.http?.url;
+
+  if (!logPath) {
+    console.log("No file path configured in audit.file.path");
+    return;
+  }
+
+  if (!httpUrl) {
+    console.log("No HTTP URL configured in audit.http.url");
+    return;
+  }
 
   if (!fs.existsSync(logPath)) {
     console.log(`No fallback log found at ${logPath}`);
@@ -47,7 +57,7 @@ async function drain() {
 
       sent++;
       process.stdout.write(".");
-    } catch (err) {
+    } catch {
       process.stdout.write("x");
       failed.push(line);
     }

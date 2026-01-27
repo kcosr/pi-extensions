@@ -24,6 +24,14 @@ function broadcast(message: object) {
   }
 }
 
+function isAuditOnlyRequest(req: http.IncomingMessage): boolean {
+  const header = req.headers["x-toolwatch-audit"];
+  if (Array.isArray(header)) {
+    return header.includes("true");
+  }
+  return header === "true";
+}
+
 export function createServer(db: ToolwatchDB, port: number) {
   const config = loadConfig();
 
@@ -38,7 +46,7 @@ export function createServer(db: ToolwatchDB, port: number) {
     // CORS headers for API
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Toolwatch-Audit");
 
     if (req.method === "OPTIONS") {
       res.writeHead(204).end();
@@ -51,7 +59,16 @@ export function createServer(db: ToolwatchDB, port: number) {
         const body = await readBody(req);
         const event = JSON.parse(body) as ToolwatchEvent;
 
+        const auditOnly = isAuditOnlyRequest(req);
+
         if (event.type === "tool_call") {
+          if (auditOnly) {
+            db.insertToolCall({ ...event, approvalStatus: "approved" });
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ approved: true }));
+            return;
+          }
+
           // Evaluate rules first to determine if we need approval
           const result = await evaluateToolCall(event, config, db);
 
@@ -217,35 +234,39 @@ async function evaluateToolCall(
   config: Config,
   db: ToolwatchDB
 ): Promise<{ approved: boolean; reason?: string }> {
-  const { response, pluginName } = evaluateRules(event, config.rules);
+  const { response, pluginName, requiresManual } = evaluateRules(event, config.rules);
 
-  // If no plugin needed, store and return immediate response
-  if (!pluginName) {
-    console.log(`[rules] ${event.tool}: ${response.approved ? "allow" : "deny"} - ${response.reason ?? ""}`);
-    db.insertToolCall({
-      ...event,
-      approvalStatus: response.approved ? "approved" : "denied",
-    });
-    // Update with reason if denied
-    if (!response.approved && response.reason) {
-      db.updateApprovalStatus(event.toolCallId, "denied", response.reason);
+  // Manual approval - use the manual plugin
+  if (requiresManual) {
+    db.insertToolCall({ ...event, approvalStatus: "pending" });
+    console.log(`[rules] ${event.tool}: manual approval required`);
+    return manualPlugin.evaluate(event);
+  }
+
+  // Plugin required
+  if (pluginName) {
+    const plugin = await loadPlugin(pluginName, config);
+    if (!plugin) {
+      console.error(`[rules] Plugin not found: ${pluginName}, denying`);
+      db.insertToolCall({ ...event, approvalStatus: "denied" });
+      return { approved: false, reason: `Plugin not found: ${pluginName}` };
     }
-    return response;
+
+    db.insertToolCall({ ...event, approvalStatus: "pending" });
+    console.log(`[rules] ${event.tool}: invoking plugin "${pluginName}"`);
+    return plugin.evaluate(event);
   }
 
-  // Load plugin
-  const plugin = await loadPlugin(pluginName, config);
-  if (!plugin) {
-    console.error(`[rules] Plugin not found: ${pluginName}, denying`);
-    db.insertToolCall({ ...event, approvalStatus: "denied" });
-    return { approved: false, reason: `Plugin not found: ${pluginName}` };
+  // Immediate response (allow/deny)
+  console.log(`[rules] ${event.tool}: ${response.approved ? "allow" : "deny"} - ${response.reason ?? ""}`);
+  db.insertToolCall({
+    ...event,
+    approvalStatus: response.approved ? "approved" : "denied",
+  });
+  if (!response.approved && response.reason) {
+    db.updateApprovalStatus(event.toolCallId, "denied", response.reason);
   }
-
-  // Store with pending status before invoking plugin
-  db.insertToolCall({ ...event, approvalStatus: "pending" });
-
-  console.log(`[rules] ${event.tool}: invoking plugin "${pluginName}"`);
-  return plugin.evaluate(event);
+  return response;
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
