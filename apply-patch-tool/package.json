@@ -1,0 +1,13 @@
+{
+  "name": "apply-patch-tool",
+  "version": "0.1.0",
+  "description": "Codex-style apply_patch tool extension for pi",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --import tsx"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
