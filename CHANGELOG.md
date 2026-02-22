@@ -16,6 +16,7 @@
   - Design document at `toolwatch/docs/design/local-rules.md`
   - Bundled distribution via `npm run dist` (no npm install required at destination)
 - **toolwatch**: Collector accepts audit-only HTTP events (`X-Toolwatch-Audit: true`) and records them as approved without rule evaluation
+- **agent-voice-adapter-reminder**: Add extension for `kcosr/agent-voice-adapter` workflows with session-scoped `/ava-mode`, persisted `/ava-set` defaults (`default-mode`, `max-reminders`), `/ava-status`, `/ava-reminder mark-stopped`, `agent_voice_adapter_session_done` tool, and per-session max reminder counting
 
 ### Changed
 - **assistant**: Add list/instance/include pickers, scoped search with all-list/instance modes, and persisted picker state
