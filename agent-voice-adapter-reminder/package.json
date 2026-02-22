@@ -1,0 +1,16 @@
+{
+  "name": "agent-voice-adapter-reminder",
+  "version": "0.1.0",
+  "description": "Ensure pi voice sessions end with an interactive agent-voice-adapter prompt when needed",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "node --test logic.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kcosr/pi-extensions"
+  },
+  "author": "kcosr",
+  "license": "MIT"
+}

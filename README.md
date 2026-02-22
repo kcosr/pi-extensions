@@ -48,5 +48,6 @@ Reload pi after installing.
 | [assistant](assistant/) | Browse Assistant lists and notes with fuzzy search and inject selections via `/assistant`. |
 | [skill-picker](skill-picker/) | Command palette for selecting and queueing skills explicitly via `/skill` command. Hard fork of [pi-skill-palette](https://github.com/nicobailon/pi-skill-palette). |
 | [toolwatch](toolwatch/) | Tool call auditing and approval system. Log all tool calls to SQLite, block dangerous commands, require manual approval for sensitive operations. |
+| [agent-voice-adapter-reminder](agent-voice-adapter-reminder/) | Tracks agent completion and nudges voice-first flows to end with interactive `agent-voice-adapter-cli` turns. |
 
 See each extension's README for configuration details.
