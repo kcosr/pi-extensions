@@ -1,6 +1,6 @@
 {
   "name": "@pi-extensions/toolwatch-common",
-  "version": "0.0.1",
+  "version": "0.2.4",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

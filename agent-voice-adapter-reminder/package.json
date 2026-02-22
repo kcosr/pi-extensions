@@ -1,6 +1,6 @@
 {
   "name": "agent-voice-adapter-reminder",
-  "version": "0.1.0",
+  "version": "0.2.4",
   "description": "Ensure pi voice sessions end with an interactive agent-voice-adapter prompt when needed",
   "main": "index.ts",
   "type": "module",

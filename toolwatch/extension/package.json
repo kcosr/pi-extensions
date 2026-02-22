@@ -1,6 +1,6 @@
 {
   "name": "@pi-extensions/toolwatch",
-  "version": "0.0.1",
+  "version": "0.2.4",
   "type": "module",
   "main": "index.ts",
   "scripts": {

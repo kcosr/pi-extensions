@@ -1,6 +1,6 @@
 {
   "name": "toolwatch-collector",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "scripts": {
     "postinstall": "cd ../common && npm install && npm run build",
