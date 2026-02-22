@@ -1,6 +1,6 @@
 export const AVA_MODES = ["off", "auto", "on"];
 
-const VOICE_CLI_PATTERN = /(^|[^\w-])agent-voice-adapter-cli(?:\.js)?(?=$|[^\w-])/;
+const VOICE_CLI_PATTERN = /(^|[^\w-])agent-voice-adapter-cli\.js(?=$|[^\w-])/;
 const NO_WAIT_PATTERN = /(^|\s)--no-wait(?=\s|$)/;
 
 export function isInteractiveVoiceAdapterCommand(command) {
@@ -17,9 +17,12 @@ export function shouldQueueVoiceFollowUp({
 	mode,
 	stoppedUntilUserInput,
 	lastSuccessfulToolWasInteractiveVoice,
+	reminderCount,
+	maxReminders,
 }) {
 	if (mode === "off") return false;
 	if (stoppedUntilUserInput) return false;
+	if (Number.isFinite(maxReminders) && maxReminders >= 0 && reminderCount >= maxReminders) return false;
 	if (mode === "auto" && lastSuccessfulToolWasInteractiveVoice) return false;
 	return true;
 }
