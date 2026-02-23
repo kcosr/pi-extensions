@@ -46,14 +46,26 @@ Queued skills are applied to your next message.
 
 ## Skill Locations
 
-Skills are loaded from these directories (in order):
+By default, skills are loaded from:
 
-1. `~/.codex/skills/` — Codex user skills (recursive)
-2. `~/.claude/skills/` — Claude user skills (one level deep)
-3. `.claude/skills/` — Claude project skills (one level deep)
-4. `~/.pi/agent/skills/` — Pi user skills (recursive)
-5. `~/.pi/skills/` — Legacy user skills (recursive)
-6. `.pi/skills/` — Pi project skills (recursive)
+1. `~/.agents/skills/` — recursive scan for `SKILL.md`
+
+You can override scan directories via:
+
+`~/.pi/agent/extensions/skill-picker/config.json`
+
+```json
+{
+  "skillDirs": [
+    { "dir": "~/.agents/skills", "format": "recursive" }
+  ]
+}
+```
+
+- `dir`: absolute path or `~/...` path
+- `format`:
+  - `recursive` (search all subdirectories for `SKILL.md`)
+  - `claude` (one level deep; each direct child directory must contain `SKILL.md`)
 
 Each skill must live in its own directory with a `SKILL.md` that includes frontmatter:
 

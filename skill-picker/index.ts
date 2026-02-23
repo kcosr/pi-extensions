@@ -115,6 +115,66 @@ interface SkillDirConfig {
 	format: SkillFormat;
 }
 
+interface SkillPickerConfig {
+	skillDirs?: Array<SkillDirConfig | string>;
+}
+
+const SKILL_PICKER_CONFIG_PATH = path.join(
+	os.homedir(),
+	".pi",
+	"agent",
+	"extensions",
+	"skill-picker",
+	"config.json",
+);
+
+const DEFAULT_SKILL_DIRS: SkillDirConfig[] = [
+	{ dir: path.join(os.homedir(), ".agents", "skills"), format: "recursive" },
+];
+
+function expandHomePath(inputPath: string): string {
+	if (inputPath === "~") return os.homedir();
+	if (inputPath.startsWith("~/")) {
+		return path.join(os.homedir(), inputPath.slice(2));
+	}
+	return inputPath;
+}
+
+function normalizeSkillDirConfig(entry: SkillDirConfig | string): SkillDirConfig | null {
+	if (typeof entry === "string") {
+		const dir = expandHomePath(entry.trim());
+		if (!dir) return null;
+		return { dir, format: "recursive" };
+	}
+
+	if (!entry || typeof entry !== "object") return null;
+	const dir = typeof entry.dir === "string" ? expandHomePath(entry.dir.trim()) : "";
+	if (!dir) return null;
+	const format: SkillFormat = entry.format === "claude" ? "claude" : "recursive";
+	return { dir, format };
+}
+
+function loadSkillDirs(): SkillDirConfig[] {
+	try {
+		if (!fs.existsSync(SKILL_PICKER_CONFIG_PATH)) {
+			return DEFAULT_SKILL_DIRS;
+		}
+		const content = fs.readFileSync(SKILL_PICKER_CONFIG_PATH, "utf-8");
+		const config = JSON.parse(content) as SkillPickerConfig;
+		if (!Array.isArray(config.skillDirs)) {
+			return DEFAULT_SKILL_DIRS;
+		}
+
+		const normalized = config.skillDirs
+			.map((entry) => normalizeSkillDirConfig(entry))
+			.filter((entry): entry is SkillDirConfig => entry !== null);
+
+		return normalized.length > 0 ? normalized : DEFAULT_SKILL_DIRS;
+	} catch {
+		return DEFAULT_SKILL_DIRS;
+	}
+}
+
 /**
  * Scan a directory for skills based on the format
  * - "recursive": scans directories recursively looking for SKILL.md files
@@ -206,25 +266,13 @@ function loadSkillFromFile(filePath: string, skillsByName: Map<string, Skill>): 
 }
 
 /**
- * Load skills from known directories
- * Matches pi's skill loading order:
- * 1. ~/.codex/skills (recursive)
- * 2. ~/.claude/skills (claude format - one level)
- * 3. ${cwd}/.claude/skills (claude format - one level)
- * 4. ~/.pi/agent/skills (recursive)
- * 5. ${cwd}/.pi/skills (recursive)
+ * Load skills from configured directories.
+ *
+ * Defaults to ~/.agents/skills when no config file is present.
  */
 function loadSkills(): Skill[] {
 	const skillsByName = new Map<string, Skill>();
-	
-	const skillDirs: SkillDirConfig[] = [
-		{ dir: path.join(os.homedir(), ".codex", "skills"), format: "recursive" },
-		{ dir: path.join(os.homedir(), ".claude", "skills"), format: "claude" },
-		{ dir: path.join(process.cwd(), ".claude", "skills"), format: "claude" },
-		{ dir: path.join(os.homedir(), ".pi", "agent", "skills"), format: "recursive" },
-		{ dir: path.join(os.homedir(), ".pi", "skills"), format: "recursive" },
-		{ dir: path.join(process.cwd(), ".pi", "skills"), format: "recursive" },
-	];
+	const skillDirs = loadSkillDirs();
 
 	for (const { dir, format } of skillDirs) {
 		scanSkillDir(dir, format, skillsByName);
