@@ -1,6 +1,6 @@
 {
   "name": "apply-patch-tool",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Codex-style apply_patch tool extension for pi",
   "main": "index.ts",
   "type": "module",
