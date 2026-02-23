@@ -190,6 +190,9 @@ export default function (pi: ExtensionAPI) {
 		if (!state.endMessageEnabled) return;
 		try {
 			await pi.exec("agent-voice-adapter-cli.js", ["--no-wait", state.endMessage]);
+			if (ctx.hasUI) {
+				ctx.ui.notify(`agent-voice-adapter end message sent: "${state.endMessage}"`, "info");
+			}
 		} catch (error) {
 			if (ctx.hasUI) {
 				const message = error instanceof Error ? error.message : String(error);
