@@ -7,6 +7,9 @@
 ### Added
 
 ### Changed
+- **agent-voice-adapter-reminder**: Make `/ava-set` session-scoped and add `/ava-set-default` for global defaults
+- **agent-voice-adapter-reminder**: Add `end-message-enabled` and `end-message` settings with no-wait end-message execution on `agent_end` when reminders are not sent
+- **agent-voice-adapter-reminder**: Expand README with feature summary, explicit persistence behavior, and a future enhancements section
 
 ### Fixed
 

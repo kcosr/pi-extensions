@@ -11,6 +11,8 @@ type AvaMode = "off" | "auto" | "on";
 interface AvaConfig {
 	defaultMode?: AvaMode;
 	defaultMaxReminders?: number;
+	defaultEndMessageEnabled?: boolean;
+	defaultEndMessage?: string;
 }
 
 interface SessionState {
@@ -20,10 +22,14 @@ interface SessionState {
 	interactiveVoiceToolCalls: Set<string>;
 	reminderCount: number;
 	maxReminders: number;
+	endMessageEnabled: boolean;
+	endMessage: string;
 }
 
 const AVA_FOLLOW_UP_PROMPT =
 	"Before you finish, prompt the user with agent-voice-adapter-cli.js in interactive mode (without --no-wait).";
+
+const DEFAULT_END_MESSAGE = "Agent finished";
 
 const CONFIG_PATH = path.join(
 	os.homedir(),
@@ -41,6 +47,24 @@ function parseNonNegativeInt(value: string): number | null {
 	return parsed;
 }
 
+function parseBoolean(value: string): boolean | null {
+	const normalized = value.trim().toLowerCase();
+	if (["true", "1", "yes", "on", "enabled"].includes(normalized)) return true;
+	if (["false", "0", "no", "off", "disabled"].includes(normalized)) return false;
+	return null;
+}
+
+function parseKeyValueArgs(args: string): { key: string; value: string } | null {
+	const trimmed = args.trim();
+	if (!trimmed) return null;
+	const splitAt = trimmed.indexOf(" ");
+	if (splitAt === -1) return { key: trimmed.toLowerCase(), value: "" };
+	return {
+		key: trimmed.slice(0, splitAt).toLowerCase(),
+		value: trimmed.slice(splitAt + 1).trim(),
+	};
+}
+
 function loadConfig(): AvaConfig {
 	try {
 		if (!fs.existsSync(CONFIG_PATH)) return {};
@@ -52,6 +76,12 @@ function loadConfig(): AvaConfig {
 		}
 		if (typeof parsed.defaultMaxReminders === "number" && parsed.defaultMaxReminders >= 0) {
 			config.defaultMaxReminders = Math.floor(parsed.defaultMaxReminders);
+		}
+		if (typeof parsed.defaultEndMessageEnabled === "boolean") {
+			config.defaultEndMessageEnabled = parsed.defaultEndMessageEnabled;
+		}
+		if (typeof parsed.defaultEndMessage === "string" && parsed.defaultEndMessage.trim().length > 0) {
+			config.defaultEndMessage = parsed.defaultEndMessage;
 		}
 		return config;
 	} catch {
@@ -80,6 +110,8 @@ export default function (pi: ExtensionAPI) {
 	const config = loadConfig();
 	let defaultMode: AvaMode = config.defaultMode ?? "auto";
 	let defaultMaxReminders = config.defaultMaxReminders ?? 2;
+	let defaultEndMessageEnabled = config.defaultEndMessageEnabled ?? false;
+	let defaultEndMessage = config.defaultEndMessage ?? DEFAULT_END_MESSAGE;
 
 	const sessionStates = new Map<string, SessionState>();
 
@@ -94,11 +126,21 @@ export default function (pi: ExtensionAPI) {
 				interactiveVoiceToolCalls: new Set<string>(),
 				reminderCount: 0,
 				maxReminders: defaultMaxReminders,
+				endMessageEnabled: defaultEndMessageEnabled,
+				endMessage: defaultEndMessage,
 			};
 			sessionStates.set(key, state);
 		}
 		return state;
 	};
+
+	const persistDefaults = (): { success: true } | { success: false; error: string } =>
+		saveConfig({
+			defaultMode,
+			defaultMaxReminders,
+			defaultEndMessageEnabled,
+			defaultEndMessage,
+		});
 
 	pi.on("input", async (event, ctx) => {
 		if (event.source !== "extension") {
@@ -139,10 +181,21 @@ export default function (pi: ExtensionAPI) {
 			reminderCount: state.reminderCount,
 			maxReminders: state.maxReminders,
 		});
-		if (!shouldQueue) return;
+		if (shouldQueue) {
+			state.reminderCount += 1;
+			pi.sendUserMessage(AVA_FOLLOW_UP_PROMPT);
+			return;
+		}
 
-		state.reminderCount += 1;
-		pi.sendUserMessage(AVA_FOLLOW_UP_PROMPT);
+		if (!state.endMessageEnabled) return;
+		try {
+			await pi.exec("agent-voice-adapter-cli.js", ["--no-wait", state.endMessage]);
+		} catch (error) {
+			if (ctx.hasUI) {
+				const message = error instanceof Error ? error.message : String(error);
+				ctx.ui.notify(`AVA end-message failed: ${message}`, "warning");
+			}
+		}
 	});
 
 	pi.registerCommand("ava-mode", {
@@ -166,53 +219,142 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("ava-set", {
-		description: "Set default config: /ava-set default-mode <off|auto|on> or /ava-set max-reminders <n>",
+		description: "Set session config: max-reminders | end-message-enabled | end-message | mode",
 		handler: async (args, ctx) => {
-			const parts = (args ?? "").trim().split(/\s+/).filter(Boolean);
-			if (parts.length !== 2) {
-				ctx.ui.notify("Usage: /ava-set default-mode <off|auto|on> OR /ava-set max-reminders <n>", "warning");
-				return;
-			}
-
-			const [key, value] = parts;
-			if (key === "default-mode") {
-				if (!isAvaMode(value)) {
-					ctx.ui.notify("Usage: /ava-set default-mode <off|auto|on>", "warning");
-					return;
-				}
-				defaultMode = value as AvaMode;
-				const result = saveConfig({ defaultMode, defaultMaxReminders });
-				if (!result.success) {
-					ctx.ui.notify(`Failed to save config: ${result.error}`, "error");
-					return;
-				}
+			const state = getSessionState(ctx);
+			const parsed = parseKeyValueArgs(args ?? "");
+			if (!parsed || !parsed.key) {
 				ctx.ui.notify(
-					`ava-set saved default-mode=${defaultMode} (applies to new sessions)`,
-					"info",
+					"Usage: /ava-set <max-reminders|end-message-enabled|end-message|mode> <value>",
+					"warning",
 				);
 				return;
 			}
 
+			const { key, value } = parsed;
+
 			if (key === "max-reminders") {
-				const parsed = parseNonNegativeInt(value);
-				if (parsed === null) {
+				const n = parseNonNegativeInt(value);
+				if (n === null) {
 					ctx.ui.notify("Usage: /ava-set max-reminders <non-negative integer>", "warning");
 					return;
 				}
-				defaultMaxReminders = parsed;
-				const result = saveConfig({ defaultMode, defaultMaxReminders });
-				if (!result.success) {
-					ctx.ui.notify(`Failed to save config: ${result.error}`, "error");
+				state.maxReminders = n;
+				ctx.ui.notify(`ava-set max-reminders=${state.maxReminders} (session)`, "info");
+				return;
+			}
+
+			if (key === "end-message-enabled") {
+				const enabled = parseBoolean(value);
+				if (enabled === null) {
+					ctx.ui.notify("Usage: /ava-set end-message-enabled <true|false>", "warning");
 					return;
 				}
+				state.endMessageEnabled = enabled;
+				ctx.ui.notify(`ava-set end-message-enabled=${state.endMessageEnabled} (session)`, "info");
+				return;
+			}
+
+			if (key === "end-message") {
+				if (!value) {
+					ctx.ui.notify("Usage: /ava-set end-message <text>", "warning");
+					return;
+				}
+				state.endMessage = value;
+				ctx.ui.notify(`ava-set end-message=\"${state.endMessage}\" (session)`, "info");
+				return;
+			}
+
+			if (key === "mode") {
+				if (!isAvaMode(value)) {
+					ctx.ui.notify("Usage: /ava-set mode <off|auto|on>", "warning");
+					return;
+				}
+				state.mode = value as AvaMode;
+				ctx.ui.notify(`ava-set mode=${state.mode} (session)`, "info");
+				return;
+			}
+
+			ctx.ui.notify("Unknown key. Valid keys: max-reminders, end-message-enabled, end-message, mode", "warning");
+		},
+	});
+
+	pi.registerCommand("ava-set-default", {
+		description: "Set global defaults for new sessions: max-reminders | end-message-enabled | end-message | mode",
+		handler: async (args, ctx) => {
+			const parsed = parseKeyValueArgs(args ?? "");
+			if (!parsed || !parsed.key) {
 				ctx.ui.notify(
-					`ava-set saved max-reminders=${defaultMaxReminders} (applies to new sessions)`,
-					"info",
+					"Usage: /ava-set-default <max-reminders|end-message-enabled|end-message|mode> <value>",
+					"warning",
 				);
 				return;
 			}
 
-			ctx.ui.notify("Unknown key. Valid keys: default-mode, max-reminders", "warning");
+			const { key, value } = parsed;
+			if (key === "max-reminders") {
+				const n = parseNonNegativeInt(value);
+				if (n === null) {
+					ctx.ui.notify("Usage: /ava-set-default max-reminders <non-negative integer>", "warning");
+					return;
+				}
+				defaultMaxReminders = n;
+				const result = persistDefaults();
+				if (!result.success) {
+					ctx.ui.notify(`Failed to save config: ${result.error}`, "error");
+					return;
+				}
+				ctx.ui.notify(`ava-set-default max-reminders=${defaultMaxReminders}`, "info");
+				return;
+			}
+
+			if (key === "end-message-enabled") {
+				const enabled = parseBoolean(value);
+				if (enabled === null) {
+					ctx.ui.notify("Usage: /ava-set-default end-message-enabled <true|false>", "warning");
+					return;
+				}
+				defaultEndMessageEnabled = enabled;
+				const result = persistDefaults();
+				if (!result.success) {
+					ctx.ui.notify(`Failed to save config: ${result.error}`, "error");
+					return;
+				}
+				ctx.ui.notify(`ava-set-default end-message-enabled=${defaultEndMessageEnabled}`, "info");
+				return;
+			}
+
+			if (key === "end-message") {
+				if (!value) {
+					ctx.ui.notify("Usage: /ava-set-default end-message <text>", "warning");
+					return;
+				}
+				defaultEndMessage = value;
+				const result = persistDefaults();
+				if (!result.success) {
+					ctx.ui.notify(`Failed to save config: ${result.error}`, "error");
+					return;
+				}
+				ctx.ui.notify(`ava-set-default end-message=\"${defaultEndMessage}\"`, "info");
+				return;
+			}
+
+			if (key === "mode") {
+				if (!isAvaMode(value)) {
+					ctx.ui.notify("Usage: /ava-set-default mode <off|auto|on>", "warning");
+					return;
+				}
+				defaultMode = value as AvaMode;
+				const result = persistDefaults();
+				if (!result.success) {
+					ctx.ui.notify(`Failed to save config: ${result.error}`, "error");
+					return;
+				}
+				ctx.ui.notify(`ava-set-default mode=${defaultMode}`, "info");
+				return;
+			}
+
+			ctx.ui.notify("Unknown key. Valid keys: max-reminders, end-message-enabled, end-message, mode", "warning");
 		},
 	});
 
@@ -221,7 +363,7 @@ export default function (pi: ExtensionAPI) {
 		handler: async (_args, ctx) => {
 			const state = getSessionState(ctx);
 			ctx.ui.notify(
-				`ava-status mode=${state.mode}, defaultMode=${defaultMode}, reminderCount=${state.reminderCount}/${state.maxReminders}, defaultMaxReminders=${defaultMaxReminders}, stoppedUntilUserInput=${state.stoppedUntilUserInput}, lastSuccessfulToolWasInteractiveVoice=${state.lastSuccessfulToolWasInteractiveVoice}`,
+				`ava-status mode=${state.mode}, defaultMode=${defaultMode}, reminderCount=${state.reminderCount}/${state.maxReminders}, defaultMaxReminders=${defaultMaxReminders}, endMessageEnabled=${state.endMessageEnabled}, defaultEndMessageEnabled=${defaultEndMessageEnabled}, endMessage=\"${state.endMessage}\", defaultEndMessage=\"${defaultEndMessage}\", stoppedUntilUserInput=${state.stoppedUntilUserInput}, lastSuccessfulToolWasInteractiveVoice=${state.lastSuccessfulToolWasInteractiveVoice}`,
 				"info",
 			);
 		},
@@ -260,6 +402,10 @@ export default function (pi: ExtensionAPI) {
 					reminderCount: state.reminderCount,
 					maxReminders: state.maxReminders,
 					defaultMaxReminders,
+					endMessageEnabled: state.endMessageEnabled,
+					defaultEndMessageEnabled,
+					endMessage: state.endMessage,
+					defaultEndMessage,
 					stoppedUntilUserInput: state.stoppedUntilUserInput,
 					lastSuccessfulToolWasInteractiveVoice: state.lastSuccessfulToolWasInteractiveVoice,
 				},
