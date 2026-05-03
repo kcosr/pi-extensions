@@ -1,7 +1,9 @@
 ## `apply_patch`
 
-Use the `apply_patch` shell command to edit files.
-Your patch language is a stripped‑down, file‑oriented diff format designed to be easy to parse and safe to apply. You can think of it as a high‑level envelope:
+Use the `apply_patch` tool to create, edit, rename, and delete files.
+Pass the whole patch as the tool's `input` string. Do not call `apply_patch` through `bash` or a shell command.
+
+The patch language is a stripped-down, file-oriented diff format designed to be easy to parse and safe to apply. You can think of it as a high-level envelope:
 
 *** Begin Patch
 [ one or more file sections ]
@@ -16,10 +18,14 @@ Each operation starts with one of three headers:
 *** Update File: <path> - patch an existing file in place (optionally with a rename).
 
 May be immediately followed by *** Move to: <new path> if you want to rename the file.
-Then one or more “hunks”, each introduced by @@ (optionally followed by a hunk header).
+Then one or more hunks, each introduced by `@@` optionally followed by a hunk header.
 Within a hunk each line starts with:
 
-For instructions on [context_before] and [context_after]:
+- space (` `) for unchanged context
+- `-` for lines to remove
+- `+` for lines to add
+
+For editing existing files:
 - By default, show 3 lines of code immediately above and 3 lines immediately below each change. If a change is within 3 lines of a previous change, do NOT duplicate the first change’s [context_after] lines in the second change’s [context_before] lines.
 - If 3 lines of context is insufficient to uniquely identify the snippet of code within the file, use the @@ operator to indicate the class or function to which the snippet belongs. For instance, we might have:
 @@ class BaseClass
@@ -49,6 +55,42 @@ MoveTo := "*** Move to: " newPath NEWLINE
 Hunk := "@@" [ header ] NEWLINE { HunkLine } [ "*** End of File" NEWLINE ]
 HunkLine := (" " | "-" | "+") text NEWLINE
 
+Create a new file:
+
+*** Begin Patch
+*** Add File: src/hello.txt
++export function hello() {
++  return "Hello, world!";
++}
+*** End Patch
+
+Edit an existing file:
+
+*** Begin Patch
+*** Update File: src/app.ts
+@@
+ function greet() {
+-  return "Hi";
++  return "Hello, world!";
+ }
+*** End Patch
+
+Rename and edit a file:
+
+*** Begin Patch
+*** Update File: src/app.py
+*** Move to: src/main.py
+@@ def greet():
+-print("Hi")
++print("Hello, world!")
+*** End Patch
+
+Delete a file:
+
+*** Begin Patch
+*** Delete File: obsolete.txt
+*** End Patch
+
 A full patch can combine several operations:
 
 *** Begin Patch
@@ -64,12 +106,10 @@ A full patch can combine several operations:
 
 It is important to remember:
 
-- You must include a header with your intended action (Add/Delete/Update)
-- You must prefix new lines with `+` even when creating a new file
-- File references can only be relative, NEVER ABSOLUTE.
+- You must include a header with your intended action (Add/Delete/Update).
+- For `*** Add File`, every content line must start with `+`.
+- For `*** Update File`, include enough unchanged context lines (space-prefixed) to uniquely identify the edit.
+- File references can only be relative, NEVER absolute.
+- Prefer `apply_patch` for normal file edits. Use other tools only when generated output or bulk scripted changes are more appropriate.
 
-You can invoke apply_patch like:
-
-```
-shell {"command":["apply_patch","*** Begin Patch\n*** Add File: hello.txt\n+Hello, world!\n*** End Patch\n"]}
-```
+Invoke it as a tool call with an `input` field containing the patch text.
